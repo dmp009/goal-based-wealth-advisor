@@ -208,5 +208,20 @@ def test_smoke_real_snapshot_all_methods():
             if next(e for e in etfs if e.ticker == t).asset_class.startswith("equity_")
         )
         assert eq <= mes + 1e-6
-        print(m, r.notes, r.expected_return, r.volatility, r.max_drawdown)
-        print(r.weights[r.weights > 0].round(4).to_dict())
+
+
+def test_hrp_in_house_three_assets():
+    from wealthadvisor.portfolio.optimise import _hrp_weights
+
+    names = ["A", "B", "C"]
+    sd = np.array([0.1, 0.1, 0.1])
+    corr = np.array([[1, 0.9, 0.0], [0.9, 1, 0.0], [0.0, 0.0, 1]])
+    cov = pd.DataFrame(corr * np.outer(sd, sd), index=names, columns=names)
+    w = _hrp_weights(cov)
+    assert w.sum() == pytest.approx(1.0)
+    assert (w > 0).all()
+    assert w["C"] > w["A"] and w["C"] > w["B"]
+    assert w["A"] == pytest.approx(w["B"])
+    # cluster var of {A,B} = 0.0095, of C = 0.01 -> C weight = 0.0095 / 0.0195
+    assert w["C"] == pytest.approx(0.0095 / 0.0195, abs=1e-6)
+    assert _hrp_weights(cov.iloc[:1, :1]).iloc[0] == 1.0

@@ -13,24 +13,13 @@ from typing import Literal
 import cvxpy as cp
 import numpy as np
 import pandas as pd
-import scipy.cluster.hierarchy as sch
-from pypfopt import BlackLittermanModel, EfficientFrontier, HRPOpt
+from pypfopt import BlackLittermanModel, EfficientFrontier
 from pypfopt.exceptions import OptimizationError
+from scipy.cluster.hierarchy import leaves_list, linkage
+from scipy.spatial.distance import squareform
 
 from wealthadvisor.config import ETF, ProfileRule, load_etfs, load_reference_weights
 from wealthadvisor.portfolio.riskmodel import common_window
-
-# PyPortfolioOpt's HRPOpt reads a private scipy attribute removed in recent scipy releases.
-if not hasattr(sch, "_LINKAGE_METHODS"):
-    sch._LINKAGE_METHODS = {
-        "single",
-        "complete",
-        "average",
-        "weighted",
-        "centroid",
-        "median",
-        "ward",
-    }
 
 _SOLVER_ERRORS = (ValueError, OptimizationError, cp.error.SolverError)
 DELTA = 2.5
@@ -49,8 +38,49 @@ class OptResult:
 
 def _clean(w: pd.Series) -> pd.Series:
     w = w.clip(lower=0.0)
-    w[w < TINY] = 0.0
-    return w / w.sum()
+    kept = w.where(w >= TINY, 0.0)
+    if kept.sum() <= 0:  # all-tiny vector: keep the raw (clipped) weights rather than divide by 0
+        kept = w
+    return kept / kept.sum()
+
+
+def _hrp_weights(cov: pd.DataFrame) -> pd.Series:
+    """Hierarchical Risk Parity (Lopez de Prado) from the shared covariance matrix.
+
+    Distance sqrt((1 - corr) / 2), single linkage, quasi-diagonalised leaf order, recursive
+    bisection with inverse-variance cluster weights.
+    """
+    n = len(cov)
+    if n == 1:
+        return pd.Series(1.0, index=cov.index)
+    sd = np.sqrt(np.diag(cov.values))
+    corr = np.clip(cov.values / np.outer(sd, sd), -1.0, 1.0)
+    dist = np.sqrt(np.clip((1 - corr) / 2, 0.0, None))
+    np.fill_diagonal(dist, 0.0)
+    order = list(leaves_list(linkage(squareform(dist, checks=False), method="single")))
+    c = cov.values
+
+    def cluster_var(idx: list[int]) -> float:
+        sub = c[np.ix_(idx, idx)]
+        ivp = 1.0 / np.diag(sub)
+        ivp /= ivp.sum()
+        return float(ivp @ sub @ ivp)
+
+    w = np.ones(n)
+    clusters = [order]
+    while clusters:
+        clusters = [
+            half
+            for cl in clusters
+            if len(cl) > 1
+            for half in (cl[: len(cl) // 2], cl[len(cl) // 2 :])
+        ]
+        for left, right in zip(clusters[::2], clusters[1::2]):
+            vl, vr = cluster_var(left), cluster_var(right)
+            alpha = 1 - vl / (vl + vr)
+            w[left] *= alpha
+            w[right] *= 1 - alpha
+    return pd.Series(w / w.sum(), index=cov.index)
 
 
 def _max_drawdown(w: pd.Series, window: pd.DataFrame) -> float:
@@ -154,6 +184,10 @@ def _bl_returns(tickers, cov, etfs_by_t, views) -> pd.Series:
     n_cls = pd.Series(classes).value_counts()
     present = {c: ref[c] for c in n_cls.index if c in ref}
     total = sum(present.values())
+    if total <= 0:
+        raise ValueError(
+            "No reference weight for any asset class in the universe (Black-Litterman)."
+        )
     w_ref = pd.Series([present.get(c, 0.0) / total / n_cls[c] for c in classes], index=tickers)
     pi = DELTA * cov.loc[tickers, tickers] @ w_ref
     if not views:
@@ -204,7 +238,7 @@ def optimise(
         post = _bl_returns(tickers, cov, etfs_by_t, views)
         w = _constrained(post, cov, equity, eq_cap, cap, notes)
     elif method == "hrp":
-        raw = pd.Series(HRPOpt(window).optimize()).reindex(tickers)
+        raw = _hrp_weights(cov)
         w = _hrp_adjust(raw, cov, equity, eq_cap, cap, notes)
     else:
         raise ValueError(f"Unknown method {method!r}")
@@ -217,6 +251,11 @@ def optimise(
             break
         # Zeroing tiny weights nudged a cap: re-trim just inside it, then re-clean.
         w = _clean(_hrp_adjust(w, cov, equity, eq_cap * (1 - tighten), cap * (1 - tighten), []))
+    if _vol(w, cov) > cap + 1e-6 and not any("not achievable" in n for n in notes):
+        notes.append(f"Volatility cap {cap:.2%} (sleeve) still exceeded after cleaning weights.")
+    eq_left = float(w[list(equity)].sum()) if equity else 0.0
+    if eq_cap < 1 and eq_left > eq_cap + 1e-6 and not any("Equity cap" in n for n in notes):
+        notes.append(f"Equity cap {eq_cap:.0%} still exceeded after cleaning weights.")
     return OptResult(
         weights=w,
         expected_return=float(w @ mu),
