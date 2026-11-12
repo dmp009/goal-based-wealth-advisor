@@ -1,0 +1,17 @@
+# Simplified 2026 French tax rules (design §9.7). No IR option, no inheritance rules.
+as_of: "2026"
+pea:
+  rate_before_5y: 0.30     # 12.8 % + 17.2 %
+  rate_after_5y: 0.172     # social charges only
+  threshold_years: 5
+assurance_vie:
+  rate_before_8y: 0.30
+  rate_after_8y: 0.247     # 7.5 % + 17.2 %
+  threshold_years: 8
+  allowance_single: 4600   # EUR per year, applied after 8 years
+  allowance_couple: 9200
+cto:
+  rate: 0.30
+  cost_basis: weighted_average_cost   # PRU
+livret_a:
+  rate: 0.0

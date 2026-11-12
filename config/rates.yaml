@@ -1,0 +1,17 @@
+fonds_euros:
+  value: 0.025
+  source: "Design default: typical net rate of French fonds en euros (design §6.1)"
+  as_of: "2026-01-01"
+livret_a_rate:
+  value: 0.017
+  source: "Rate in force since 1 Aug 2025 per Banque de France / Ministry of Economy; not re-checked for 2026"
+  as_of: "2026-01-01"
+  unverified: true
+livret_a_cap:
+  value: 22950
+  source: "Regulatory ceiling for Livret A deposits (EUR, per person)"
+  as_of: "2026-01-01"
+pea_contribution_cap:
+  value: 150000
+  source: "Regulatory ceiling for PEA contributions (EUR)"
+  as_of: "2026-01-01"

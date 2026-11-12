@@ -1,0 +1,9 @@
+llm_model: claude-sonnet-5-5
+seed: 42
+n_paths: 10000
+inflation: 0.02
+drift_band: 0.05
+prompt_version: "v1"
+disclaimer:
+  en: "Educational project — not investment advice"
+  fr: "Projet pédagogique — pas un conseil en investissement"

@@ -1,0 +1,9 @@
+# Own risk scale, NOT calibrated to PRIIPs SRI bands (design §9.3).
+profiles:
+  1: {vol_cap: 0.02, max_equity: 0.00, min_safe_share: 0.80}
+  2: {vol_cap: 0.04, max_equity: 0.20, min_safe_share: 0.60}
+  3: {vol_cap: 0.07, max_equity: 0.40, min_safe_share: 0.40}
+  4: {vol_cap: 0.10, max_equity: 0.60, min_safe_share: 0.25}
+  5: {vol_cap: 0.13, max_equity: 0.75, min_safe_share: 0.10}
+  6: {vol_cap: 0.16, max_equity: 0.90, min_safe_share: 0.00}
+  7: {vol_cap: 0.20, max_equity: 1.00, min_safe_share: 0.00}

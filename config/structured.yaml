@@ -1,0 +1,18 @@
+templates:
+  autocall_sx5e:
+    kind: autocall
+    underlying: "^STOXX50E"
+    years: 8
+    coupon: 0.07
+    autocall_level: 1.0
+    barrier: 0.60          # capital repaid at maturity unless index fell more than 40 %
+  cpn_sx5e:
+    kind: capital_protected_note
+    underlying: "^STOXX50E"
+    years: 8
+    participation: 0.5
+dividend_yield: 0.03       # Euro Stoxx 50 is a price index; GBM drift = CMA return - dividend yield
+max_share: 0.15            # of investable assets after the emergency fund
+eligibility:
+  min_profile: 4
+  min_horizon_years: 8

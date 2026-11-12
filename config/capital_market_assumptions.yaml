@@ -1,0 +1,25 @@
+# Expected nominal long-term annual returns per asset class.
+# Approximates J.P. Morgan Asset Management 2026 Long-Term Capital Market Assumptions
+# (35th edition, published Oct 2025). Exact published figures were NOT checked against the
+# publication: values are rounded approximations, hence unverified.
+source: "J.P. Morgan Asset Management, Long-Term Capital Market Assumptions 2026 (approximated)"
+as_of: "2025-10"
+unverified: true
+returns:
+  equity_world: 0.065
+  equity_europe: 0.070
+  equity_us: 0.067
+  equity_em: 0.078
+  bond_gov_euro: 0.030
+  bond_corp_euro: 0.037
+  bond_inflation_euro: 0.030
+# Documented reference (market-like) weights for Black-Litterman equilibrium returns. Sum to 1.
+# Simplification: world/europe/us/em overlap; weights express a prior, not a real portfolio.
+reference_weights:
+  equity_world: 0.30
+  equity_europe: 0.10
+  equity_us: 0.10
+  equity_em: 0.05
+  bond_gov_euro: 0.25
+  bond_corp_euro: 0.15
+  bond_inflation_euro: 0.05
