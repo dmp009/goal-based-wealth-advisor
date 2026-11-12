@@ -1,0 +1,34 @@
+{
+  "client_id": "c1",
+  "name": "Camille Laurent",
+  "age": 28,
+  "household": "single",
+  "annual_income": 42000,
+  "monthly_expenses": 1900,
+  "liquid_assets": 18000,
+  "debts": 4000,
+  "monthly_saving": 600,
+  "goals": [
+    {
+      "goal_id": "flat_deposit",
+      "label": "Deposit for a first flat",
+      "target_today_eur": 60000,
+      "date": "2031-06-30",
+      "priority": "essential"
+    }
+  ],
+  "answers": {
+    "etf_equity": "basic",
+    "etf_bond": "none",
+    "structured": "none",
+    "loss_capacity": "medium",
+    "income_stability": "stable",
+    "objective": "balanced_growth",
+    "horizon_bucket": "3_to_5y",
+    "risk_reaction": "hold",
+    "risk_tradeoff": "balanced",
+    "max_loss": "up_to_20pct"
+  },
+  "original_proposal": null,
+  "proposal_date": null
+}

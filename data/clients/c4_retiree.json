@@ -1,0 +1,48 @@
+{
+  "client_id": "c4",
+  "name": "Monique Girard",
+  "age": 68,
+  "household": "single",
+  "annual_income": 30000,
+  "monthly_expenses": 2100,
+  "liquid_assets": 185000,
+  "debts": 0,
+  "monthly_saving": 0,
+  "goals": [
+    {
+      "goal_id": "home_adaptation",
+      "label": "Home adaptation works",
+      "target_today_eur": 25000,
+      "date": "2028-06-30",
+      "priority": "essential"
+    },
+    {
+      "goal_id": "grandchildren",
+      "label": "Gift to grandchildren",
+      "target_today_eur": 15000,
+      "date": "2030-06-30",
+      "priority": "aspirational"
+    },
+    {
+      "goal_id": "care_reserve",
+      "label": "Long-term care reserve",
+      "target_today_eur": 60000,
+      "date": "2033-12-31",
+      "priority": "essential"
+    }
+  ],
+  "answers": {
+    "etf_equity": "none",
+    "etf_bond": "basic",
+    "structured": "none",
+    "loss_capacity": "low",
+    "income_stability": "stable",
+    "objective": "capital_preservation",
+    "horizon_bucket": "5_to_10y",
+    "risk_reaction": "sell_part",
+    "risk_tradeoff": "capital_safe",
+    "max_loss": "up_to_5pct"
+  },
+  "original_proposal": null,
+  "proposal_date": null
+}

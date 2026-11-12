@@ -1,2 +1,58 @@
-# Placeholder: sections and questions are defined in Task 3.
-sections: []
+# MiFID-style questionnaire (design §6.4). Every answer carries a score.
+# Section score = sum of its answer scores / maximum possible (0..1).
+# raw_score = 1 + 6 * sum(weight_s * section_score_s)  -> a number between 1 and 7.
+# Profile = 1 + number of `thresholds` that raw_score reaches (>=), i.e. rounding to the
+# nearest integer (x.5 rounds up). Cap rules (horizon, loss capacity, knowledge) are applied
+# afterwards in wealthadvisor/suitability/scoring.py.
+thresholds: [1.5, 2.5, 3.5, 4.5, 5.5, 6.5]
+
+sections:
+  knowledge_experience:
+    weight: 0.15
+    questions:
+      etf_equity:
+        text: "Knowledge and experience of equity ETFs"
+        answers: {none: 0, basic: 1, experienced: 2}
+      etf_bond:
+        text: "Knowledge and experience of bond ETFs"
+        answers: {none: 0, basic: 1, experienced: 2}
+      structured:
+        text: "Knowledge and experience of structured products (autocalls, capital-protected notes)"
+        answers: {none: 0, basic: 1, experienced: 2}
+  financial_situation:
+    weight: 0.25
+    questions:
+      loss_capacity:
+        text: "Capacity to bear a loss on the invested capital without changing your lifestyle"
+        answers: {low: 0, medium: 1, high: 2}
+      income_stability:
+        text: "Stability of household income"
+        answers: {unstable: 0, stable: 1, very_stable: 2}
+  objectives_horizon:
+    weight: 0.25
+    questions:
+      objective:
+        text: "Main investment objective"
+        answers: {capital_preservation: 0, regular_income: 1, balanced_growth: 2, long_term_growth: 3}
+      horizon_bucket:
+        text: "Investment horizon declared by the client"
+        answers: {lt_3y: 0, 3_to_5y: 1, 5_to_10y: 2, gt_10y: 3}
+  risk_tolerance:
+    weight: 0.35
+    questions:
+      risk_reaction:
+        text: "Your portfolio falls 20 % in three months: what do you do?"
+        answers: {sell_all: 0, sell_part: 1, hold: 2, buy_more: 3}
+      risk_tradeoff:
+        text: "Preferred return / risk trade-off"
+        answers: {capital_safe: 0, small_gain: 1, balanced: 2, high_gain: 3}
+      max_loss:
+        text: "Largest temporary loss you could accept over one year"
+        answers: {up_to_5pct: 0, up_to_10pct: 1, up_to_20pct: 2, over_20pct: 3}
+
+# Cap rules (applied in scoring.py; thresholds restated here for documentation)
+caps:
+  horizon_lt_3y: 2
+  horizon_3_to_5y: 3
+  loss_capacity_low: 3
+  no_equity_etf_knowledge: 4

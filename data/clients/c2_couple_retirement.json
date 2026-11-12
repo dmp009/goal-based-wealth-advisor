@@ -1,0 +1,63 @@
+{
+  "client_id": "c2",
+  "name": "Isabelle and Marc Moreau",
+  "age": 52,
+  "household": "couple",
+  "annual_income": 85000,
+  "monthly_expenses": 4200,
+  "liquid_assets": 215000,
+  "debts": 62000,
+  "monthly_saving": 1500,
+  "goals": [
+    {
+      "goal_id": "retirement",
+      "label": "Retirement top-up capital",
+      "target_today_eur": 250000,
+      "date": "2040-09-30",
+      "priority": "essential"
+    },
+    {
+      "goal_id": "studies",
+      "label": "Daughter's master's degree",
+      "target_today_eur": 40000,
+      "date": "2030-09-01",
+      "priority": "essential"
+    },
+    {
+      "goal_id": "renovation",
+      "label": "Country house renovation",
+      "target_today_eur": 30000,
+      "date": "2032-06-30",
+      "priority": "aspirational"
+    }
+  ],
+  "answers": {
+    "etf_equity": "basic",
+    "etf_bond": "basic",
+    "structured": "none",
+    "loss_capacity": "medium",
+    "income_stability": "stable",
+    "objective": "balanced_growth",
+    "horizon_bucket": "gt_10y",
+    "risk_reaction": "sell_part",
+    "risk_tradeoff": "balanced",
+    "max_loss": "up_to_10pct"
+  },
+  "original_proposal": {
+    "livret_a": {
+      "livret_a": 20000
+    },
+    "av": {
+      "fonds_euros": 35000,
+      "CW8.PA": 25000,
+      "MTD.PA": 10000,
+      "CRP.PA": 10000
+    },
+    "pea": {
+      "DCAM.PA": 25000,
+      "PCEU.PA": 10000
+    },
+    "cto": {}
+  },
+  "proposal_date": "2025-04-30"
+}

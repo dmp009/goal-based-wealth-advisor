@@ -1,0 +1,66 @@
+{
+  "client_id": "c3",
+  "name": "Julien Deschamps",
+  "age": 45,
+  "household": "single",
+  "annual_income": 220000,
+  "monthly_expenses": 6500,
+  "liquid_assets": 640000,
+  "debts": 190000,
+  "monthly_saving": 4000,
+  "goals": [
+    {
+      "goal_id": "retirement",
+      "label": "Retirement capital",
+      "target_today_eur": 1200000,
+      "date": "2046-12-31",
+      "priority": "essential"
+    },
+    {
+      "goal_id": "education",
+      "label": "Children's studies abroad",
+      "target_today_eur": 120000,
+      "date": "2033-09-01",
+      "priority": "essential"
+    },
+    {
+      "goal_id": "holiday_home",
+      "label": "Holiday home",
+      "target_today_eur": 250000,
+      "date": "2035-06-30",
+      "priority": "aspirational"
+    }
+  ],
+  "answers": {
+    "etf_equity": "experienced",
+    "etf_bond": "basic",
+    "structured": "experienced",
+    "loss_capacity": "high",
+    "income_stability": "very_stable",
+    "objective": "long_term_growth",
+    "horizon_bucket": "gt_10y",
+    "risk_reaction": "hold",
+    "risk_tradeoff": "balanced",
+    "max_loss": "up_to_10pct"
+  },
+  "original_proposal": {
+    "livret_a": {
+      "livret_a": 22950
+    },
+    "av": {
+      "fonds_euros": 40000,
+      "CW8.PA": 80000,
+      "structured:autocall_sx5e": 40000
+    },
+    "pea": {
+      "PE500.PA": 60000,
+      "DCAM.PA": 50000,
+      "PAEEM.PA": 20000
+    },
+    "cto": {
+      "MEUD.PA": 40000,
+      "AEEM.PA": 25000
+    }
+  },
+  "proposal_date": "2025-04-30"
+}
