@@ -9,24 +9,24 @@ description = "Goal-based wealth advisor tool for a French bank advisor (educati
 requires-python = ">=3.11"
 dependencies = [
     "pandas>=2.2",
-    "numpy",
-    "scipy",
-    "PyPortfolioOpt",
-    "scikit-learn",
-    "yfinance",
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "PyPortfolioOpt>=1.5",
+    "scikit-learn>=1.4",
+    "yfinance>=0.2.40",
     "duckdb>=1.1",
     "pandera>=0.24",
     "pydantic>=2",
-    "pyyaml",
-    "anthropic",
-    "reportlab",
-    "plotly",
+    "pyyaml>=6",
+    "anthropic>=0.40",
+    "reportlab>=4",
+    "plotly>=5.20",
     "streamlit>=1.50",
-    "requests",
+    "requests>=2.31",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "ruff"]
+dev = ["pytest>=8", "ruff>=0.5"]
 
 [tool.setuptools.packages.find]
 include = ["wealthadvisor*"]

@@ -1,4 +1,5 @@
 import os
+import re
 
 import pytest
 
@@ -31,14 +32,36 @@ def test_etf_count_and_cma_coverage():
 
 
 @pytest.mark.parametrize("ac", ["equity_world", "equity_europe"])
-def test_pea_eligible_etf_per_equity_class(ac):
-    assert any(e.pea_eligible and e.asset_class == ac for e in config.load_etfs())
+def test_verified_pea_eligible_etf_per_equity_class(ac):
+    ok = [
+        e for e in config.load_etfs()
+        if e.asset_class == ac and e.pea_eligible is True
+        and "pea_eligible" not in e.unverified_fields
+    ]
+    assert ok
+
+
+def test_isin_format_and_uniqueness():
+    isins = [e.isin for e in config.load_etfs() if e.isin is not None]
+    assert all(re.fullmatch(r"[A-Z]{2}[A-Z0-9]{9}[0-9]", i) for i in isins)
+    assert len(isins) == len(set(isins))
+
+
+def test_sources_and_unverified_fields_present():
+    valid = {"isin", "name", "pea_eligible", "sri", "ter"}
+    for e in config.load_etfs():
+        assert e.sources and all(s.startswith("https://") for s in e.sources)
+        assert isinstance(e.unverified_fields, list) and set(e.unverified_fields) <= valid
+        for f in ("isin", "pea_eligible", "sri", "ter"):
+            if getattr(e, f) is None:
+                assert f in e.unverified_fields
 
 
 def test_proxies_exist_and_same_class():
     etfs = {e.ticker: e for e in config.load_etfs()}
     for e in etfs.values():
         if e.proxy:
+            assert e.proxy in etfs
             assert etfs[e.proxy].asset_class == e.asset_class
 
 

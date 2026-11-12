@@ -13,14 +13,15 @@ CONFIG_DIR = REPO_ROOT / "config"
 @dataclass
 class ETF:
     ticker: str
-    isin: str
+    isin: str | None
     name: str
     asset_class: str
-    pea_eligible: bool
-    sri: int
-    ter: float
+    pea_eligible: bool | None
+    sri: int | None
+    ter: float | None
     proxy: str | None = None
-    unverified: bool = False
+    sources: list[str] = field(default_factory=list)
+    unverified_fields: list[str] = field(default_factory=list)
 
 
 @dataclass

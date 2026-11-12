@@ -1,123 +1,172 @@
-# 13 UCITS ETFs listed on Euronext Paris. Tickers verified to exist on Yahoo Finance (history
-# fetched 2026-11-12). ISIN, PEA eligibility, SRI and TER are NOT checked against issuer
-# factsheets, hence unverified: true on every entry. isin 'unknown' = not known.
+# 14 UCITS ETFs listed on Euronext Paris, checked 2026-11-12.
+# Tickers confirmed to exist on Yahoo Finance (yfinance history). ISIN, exact name, TER and the
+# Paris ticker come from justETF profile pages (or pea.fr for PCEU). PEA eligibility comes from the
+# French sources listed per ETF (pea.fr, avenuedesinvestisseurs.fr, invesse.fr, epargnant30.fr,
+# trackinsight.com); it was not confirmed for non-PEA-branded ETFs (null).
+# SRI (PRIIPs 1-7) could not be confirmed from any page reached: null everywhere, never guessed.
+# unverified_fields lists only the fields NOT confirmed; null means unknown.
 # proxy = longer-history ETF of the same asset class used to back-fill (design §9.1).
-# No longer-history inflation-linked ETF found on Paris, so MTI.PA has no proxy.
+# MTI.PA has no proxy: no longer-history inflation-linked ETF found on Paris.
 etfs:
   - ticker: CW8.PA
     isin: LU1681043599
-    name: "Amundi MSCI World Swap UCITS ETF Acc"
+    name: "Amundi MSCI World Swap UCITS ETF EUR Acc"
     asset_class: equity_world
     pea_eligible: true
-    sri: 5
+    sri: null
     ter: 0.0038
     proxy: null
-    unverified: true
+    sources:
+      - https://www.justetf.com/en/etf-profile.html?isin=LU1681043599
+      - https://invesse.fr/bourse/meilleur-etf-pea-2026/
+    unverified_fields: [sri]
   - ticker: DCAM.PA
-    isin: unknown
-    name: "Amundi PEA Monde (MSCI World) UCITS ETF"
+    isin: FR001400U5Q4
+    name: "Amundi PEA Monde (MSCI World) UCITS ETF Acc"
     asset_class: equity_world
     pea_eligible: true
-    sri: 5
+    sri: null
     ter: 0.002
     proxy: CW8.PA
-    unverified: true
+    sources:
+      - https://www.justetf.com/en/etf-profile.html?isin=FR001400U5Q4
+      - https://www.epargnant30.fr/etf-monde-dcam/
+      - https://avenuedesinvestisseurs.fr/meilleurs-etf-pea/
+    unverified_fields: [sri]
   - ticker: MEUD.PA
     isin: LU0908500753
     name: "Amundi Core Stoxx Europe 600 UCITS ETF Acc"
     asset_class: equity_europe
-    pea_eligible: true
-    sri: 5
+    pea_eligible: false
+    sri: null
     ter: 0.0007
     proxy: ETZ.PA
-    unverified: true
+    sources:
+      - https://www.justetf.com/en/etf-profile.html?isin=LU0908500753
+      - https://pea.fr/comparatifs/meilleur-etf-stoxx-europe-600-pea/
+    unverified_fields: [sri]
   - ticker: ETZ.PA
-    isin: unknown
-    name: "BNP Paribas Easy Stoxx Europe 600 UCITS ETF EUR C"
+    isin: FR0011550193
+    name: "BNP Paribas Easy STOXX Europe 600 UCITS ETF"
     asset_class: equity_europe
     pea_eligible: true
-    sri: 5
-    ter: 0.002
+    sri: null
+    ter: 0.0019
     proxy: null
-    unverified: true
-  - ticker: 500.PA
-    isin: LU1135865084
-    name: "Amundi S&P 500 Swap UCITS ETF Acc"
-    asset_class: equity_us
-    pea_eligible: false
-    sri: 5
+    sources:
+      - https://www.justetf.com/en/etf-profile.html?isin=FR0011550193
+      - https://pea.fr/comparatifs/meilleur-etf-stoxx-europe-600-pea/
+      - https://avenuedesinvestisseurs.fr/meilleurs-etf-pea/
+    unverified_fields: [sri]
+  - ticker: PCEU.PA
+    isin: FR0013412038
+    name: "Amundi PEA MSCI Europe UCITS ETF Acc"
+    asset_class: equity_europe
+    pea_eligible: true
+    sri: null
     ter: 0.0015
+    proxy: ETZ.PA
+    sources:
+      - https://pea.fr/comparatifs/meilleur-etf-stoxx-europe-600-pea/
+    unverified_fields: [isin, name, sri, ter]
+  - ticker: SP5C.PA
+    isin: LU1135865084
+    name: "Amundi Core S&P 500 Swap UCITS ETF Acc"
+    asset_class: equity_us
+    pea_eligible: null
+    sri: null
+    ter: 0.0005
     proxy: null
-    unverified: true
+    sources:
+      - https://www.justetf.com/en/etf-profile.html?isin=LU1135865084
+    unverified_fields: [pea_eligible, sri]
   - ticker: PE500.PA
     isin: FR0013412285
     name: "Amundi PEA S&P 500 Screened UCITS ETF Acc"
     asset_class: equity_us
     pea_eligible: true
-    sri: 5
-    ter: 0.0015
-    proxy: 500.PA
-    unverified: true
+    sri: null
+    ter: 0.0025
+    proxy: SP5C.PA
+    sources:
+      - https://www.justetf.com/en/etf-profile.html?isin=FR0013412285
+      - https://www.trackinsight.com/en/fund/PE500/characteristics
+    unverified_fields: [sri]
   - ticker: AEEM.PA
     isin: LU1681045370
-    name: "Amundi MSCI Emerging Markets Swap UCITS ETF Acc"
+    name: "Amundi MSCI Emerging Markets Swap UCITS ETF EUR Acc"
     asset_class: equity_em
-    pea_eligible: false
-    sri: 5
+    pea_eligible: null
+    sri: null
     ter: 0.002
     proxy: null
-    unverified: true
+    sources:
+      - https://www.justetf.com/en/etf-profile.html?isin=LU1681045370
+    unverified_fields: [pea_eligible, sri]
   - ticker: PAEEM.PA
-    isin: FR0013412012
+    isin: FR0013412020
     name: "Amundi PEA Emergent (MSCI Emerging) ESG Transition UCITS ETF Acc"
     asset_class: equity_em
     pea_eligible: true
-    sri: 5
+    sri: null
     ter: 0.003
     proxy: AEEM.PA
-    unverified: true
+    sources:
+      - https://www.justetf.com/en/etf-profile.html?isin=FR0013412020
+      - https://avenuedesinvestisseurs.fr/meilleurs-etf-pea/
+    unverified_fields: [sri]
   - ticker: AM3A.PA
-    isin: unknown
-    name: "Amundi Euro Government Bond Highest Rated Investment Grade UCITS ETF C"
+    isin: LU1681046691
+    name: "Amundi Euro Government Bond Highest Rated Investment Grade UCITS ETF EUR Acc"
     asset_class: bond_gov_euro
-    pea_eligible: false
-    sri: 3
+    pea_eligible: null
+    sri: null
     ter: 0.0014
     proxy: null
-    unverified: true
+    sources:
+      - https://www.justetf.com/en/etf-profile.html?isin=LU1681046691
+    unverified_fields: [pea_eligible, sri]
   - ticker: MTD.PA
-    isin: unknown
+    isin: LU1287023185
     name: "Amundi Euro Government Bond 7-10Y UCITS ETF Acc"
     asset_class: bond_gov_euro
-    pea_eligible: false
-    sri: 3
-    ter: 0.0014
+    pea_eligible: null
+    sri: null
+    ter: 0.0015
     proxy: null
-    unverified: true
+    sources:
+      - https://www.justetf.com/en/etf-profile.html?isin=LU1287023185
+    unverified_fields: [pea_eligible, sri]
   - ticker: CRP.PA
-    isin: unknown
+    isin: LU1829219127
     name: "Amundi EUR Corporate Bond Climate Paris Aligned UCITS ETF Acc"
     asset_class: bond_corp_euro
-    pea_eligible: false
-    sri: 2
-    ter: 0.0018
+    pea_eligible: null
+    sri: null
+    ter: 0.0014
     proxy: null
-    unverified: true
+    sources:
+      - https://www.justetf.com/en/etf-profile.html?isin=LU1829219127
+    unverified_fields: [pea_eligible, sri]
   - ticker: ECRP.PA
-    isin: unknown
-    name: "Amundi EUR Corporate Bond ESG UCITS ETF DR (C)"
+    isin: LU1437018168
+    name: "Amundi Index Euro Corporate SRI UCITS ETF DR (C)"
     asset_class: bond_corp_euro
-    pea_eligible: false
-    sri: 2
+    pea_eligible: null
+    sri: null
     ter: 0.0014
     proxy: CRP.PA
-    unverified: true
+    sources:
+      - https://www.justetf.com/en/etf-profile.html?isin=LU1437018168
+    unverified_fields: [pea_eligible, sri]
   - ticker: MTI.PA
-    isin: unknown
+    isin: LU1650491282
     name: "Amundi Euro Government Inflation-Linked Bond UCITS ETF Acc"
     asset_class: bond_inflation_euro
-    pea_eligible: false
-    sri: 3
-    ter: 0.001
+    pea_eligible: null
+    sri: null
+    ter: 0.0009
     proxy: null
-    unverified: true
+    sources:
+      - https://www.justetf.com/en/etf-profile.html?isin=LU1650491282
+    unverified_fields: [pea_eligible, sri]

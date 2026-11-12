@@ -4,13 +4,12 @@ fonds_euros:
   as_of: "2026-01-01"
 livret_a_rate:
   value: 0.017
-  source: "Rate in force since 1 Aug 2025 per Banque de France / Ministry of Economy; not re-checked for 2026"
-  as_of: "2026-01-01"
-  unverified: true
+  source: "https://www.service-public.gouv.fr/particuliers/vosdroits/F2365 (1.7 % from 1 Aug 2026 to 31 Jan 2027; ceiling 22,950 EUR)"
+  as_of: "2026-08-01"
 livret_a_cap:
   value: 22950
-  source: "Regulatory ceiling for Livret A deposits (EUR, per person)"
-  as_of: "2026-01-01"
+  source: "https://www.service-public.gouv.fr/particuliers/vosdroits/F2365 (ceiling for individuals)"
+  as_of: "2026-08-01"
 pea_contribution_cap:
   value: 150000
   source: "Regulatory ceiling for PEA contributions (EUR)"

@@ -1,10 +1,14 @@
 # Expected nominal long-term annual returns per asset class.
 # Approximates J.P. Morgan Asset Management 2026 Long-Term Capital Market Assumptions
 # (35th edition, published Oct 2025). Exact published figures were NOT checked against the
-# publication: values are rounded approximations, hence unverified.
+# publication: values are rounded approximations, hence unverified. Checked 2026-11-12: the J.P. Morgan
+# press release gives EM equity 7.8 % (USD basis) and a global equity figure of about 7 % (USD);
+# the full EUR matrix PDF could not be retrieved, so the euro-based figures below are NOT confirmed.
+# Partial confirmation: https://am.jpmorgan.com/us/en/asset-management/institutional/about-us/media/press-releases/jp-morgan-releases-2026-long-term-capital-market-assumptions/
 source: "J.P. Morgan Asset Management, Long-Term Capital Market Assumptions 2026 (approximated)"
 as_of: "2025-10"
 unverified: true
+unverified_fields: [equity_world, equity_europe, equity_us, bond_gov_euro, bond_corp_euro, bond_inflation_euro]  # equity_em partly confirmed (USD basis)
 returns:
   equity_world: 0.065
   equity_europe: 0.070
