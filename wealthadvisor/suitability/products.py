@@ -14,6 +14,17 @@ FAMILIES = ("livret_a", "fonds_euros", "etf_bond", "etf_equity", "structured")
 class Suitability(BaseModel):
     included: bool
     reasons: list[str]
+    warnings: list[str] = []
+
+
+def _knowledge_warning(client: Client, family: str, label: str) -> list[str]:
+    if client.answers.get(family, "none") != "none":
+        return []
+    msg = (
+        f"Client declares no knowledge of {label}: appropriateness warning, "
+        "the advisor must explain the risks before investing."
+    )
+    return [msg]
 
 
 def check_product(
@@ -28,13 +39,16 @@ def check_product(
         )
     if product_family == "etf_bond":
         return Suitability(
-            included=True, reasons=[f"Bond ETFs are allowed from profile 1 (client profile {p})."]
+            included=True,
+            reasons=[f"Bond ETFs are allowed from profile 1 (client profile {p})."],
+            warnings=_knowledge_warning(client, "etf_bond", "bond ETFs"),
         )
     if product_family == "etf_equity":
         if p >= 2:
             return Suitability(
                 included=True,
                 reasons=[f"Equity ETFs are allowed from profile 2 (client profile {p})."],
+                warnings=_knowledge_warning(client, "etf_equity", "equity ETFs"),
             )
         return Suitability(
             included=False,

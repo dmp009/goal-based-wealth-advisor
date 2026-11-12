@@ -18,6 +18,7 @@ class ProfileResult(BaseModel):
     raw_score: float
     rules_fired: list[str]
     knowledge: dict[str, bool]
+    constraints: list[str] = []  # every applicable cap, binding or not
 
 
 def client_horizon_years(client: Client, today: date) -> float:
@@ -33,6 +34,8 @@ def _raw_score(answers: dict[str, str], q: dict) -> float:
         got = best = 0
         for qid, question in section["questions"].items():
             scores = question["answers"]
+            if qid not in answers:
+                raise ValueError(f"missing answer for question {qid!r}")
             if answers[qid] not in scores:
                 raise ValueError(f"unknown answer {answers[qid]!r} for question {qid!r}")
             got += scores[answers[qid]]
@@ -50,12 +53,16 @@ def score_profile(client: Client, today: date) -> ProfileResult:
     knowledge = {f: client.answers[f] != "none" for f in KNOWLEDGE_FAMILIES}
 
     rules: list[str] = []
+    constraints: list[str] = []
 
     def cap(limit: int, sentence: str) -> None:
         nonlocal profile
         if profile > limit:
             rules.append(sentence)
+            constraints.append(sentence)
             profile = limit
+        else:
+            constraints.append(f"{sentence.rstrip('.')} (not binding, profile already {profile}).")
 
     if horizon < 3:
         cap(
@@ -80,5 +87,9 @@ def score_profile(client: Client, today: date) -> ProfileResult:
             f"No knowledge of equity ETFs: profile capped at {caps['no_equity_etf_knowledge']}.",
         )
     return ProfileResult(
-        profile=profile, raw_score=round(raw, 4), rules_fired=rules, knowledge=knowledge
+        profile=profile,
+        raw_score=round(raw, 4),
+        rules_fired=rules,
+        knowledge=knowledge,
+        constraints=constraints,
     )
