@@ -97,10 +97,20 @@ def test_shortfall_flag_and_horizon_months(proposals):
         for g, bp in zip(f["goals"], p.buckets):
             b = bp.bucket
             assert "underfunded" not in g
-            proj = projected_value(b, bp.expected_return)
-            assert g["shortfall_flag"] is (proj < b.target_nominal)
+            assert g["shortfall_flag"] is (g["probability_pct"] < 50)
+            assert g["projected_value_eur"] == round(projected_value(b, bp.expected_return))
             assert g["horizon_months_count"] == max(1, round(b.horizon_years * 12))
             assert g["horizon_years_count"] == round(b.horizon_years)
+
+
+def test_shortfall_flag_examples(proposals):
+    flags = {
+        (cid, g["goal_id"]): g["shortfall_flag"]
+        for cid, p in proposals.items()
+        for g in proposal_facts(p)["goals"]
+    }
+    assert flags[("c4", "grandchildren")] is True  # 40.8 %
+    assert flags[("c1", "flat_deposit")] is False  # 69.6 %
 
 
 def test_projected_value_hand_computed():

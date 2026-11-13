@@ -20,9 +20,10 @@ Documented conventions:
 - Goal Monte Carlo uses the chosen method's weights; safe rate = fonds en euros rate, or the
   Livret A rate when the bucket's safe sleeve is entirely in Livret A. Its tax allocation uses the
   realised wrapper amounts from ``holdings_eur`` (monthly split if the bucket has no funding).
-- ``shortfall_flag`` (facts): the deterministic pre-tax projection at the bucket's expected
-  return is below the nominal target. The Monte Carlo ``underfunded`` flag (no money at all)
-  stays internal.
+- ``shortfall_flag`` (facts): goal 'at risk', i.e. displayed ``probability_pct`` < 50, so it
+  agrees with the probability the advisor sees. ``projected_value_eur`` (deterministic,
+  pre-tax, at the bucket's expected return) is information only. The Monte Carlo
+  ``underfunded`` flag (no money at all) stays internal.
 
 Facts naming (binding for the AI numeric check): numeric leaves only under keys ending ``_pct``
 (percent units, 1 dp), ``_eur`` (0 dp), ``_year`` (4-digit), ``_count`` (integers) or ``age``.
@@ -75,7 +76,8 @@ class BucketProposal:
     safe_rate: float = 0.0
     expected_return: float = 0.0  # bucket level (safe + risky sleeve), CMA mu
     volatility: float = 0.0  # bucket level
-    shortfall_flag: bool = False  # deterministic projection at expected_return < target
+    shortfall_flag: bool = False  # goal 'at risk': displayed probability < 50 %
+    projected_value: float = 0.0  # deterministic pre-tax value at expected_return (info)
 
 
 @dataclass
@@ -264,7 +266,8 @@ def build_proposal(
                 safe_rate,
                 stats["expected_return"],
                 stats["volatility"],
-                projected_value(bucket, stats["expected_return"]) < bucket.target_nominal,
+                _pct(goal.probability) < 50,
+                projected_value(bucket, stats["expected_return"]),
             )
         )
 
@@ -349,6 +352,7 @@ def _goal_facts(bp: BucketProposal, client: Client | None, names: dict[str, str]
         "p50_eur": _eur(bp.goal.p50),
         "p90_eur": _eur(bp.goal.p90),
         "shortfall_flag": bool(bp.shortfall_flag),
+        "projected_value_eur": _eur(bp.projected_value),
         "wrappers": _wrapper_eur(bp.holdings_eur),
         "top_holdings": [
             {
