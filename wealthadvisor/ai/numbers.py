@@ -16,6 +16,10 @@ Matching rules:
   goal's numbers plus the non-goal numbers. Blocks naming no goal or several use all numbers.
   Remaining limitation: a goal described without its label/id, or two goals in one sentence, is
   matched globally, so a figure of another goal can still slip through there.
+- Residual limits: unitless plain digits match any numeric leaf within the scope (all leaves
+  outside any goal scope), and body lines are scoped only by a verbatim goal label (the goal id,
+  an ordinary word such as "retirement", scopes headings only).
+- Basis points are converted to percent; hundred/centaines/milliers are multipliers.
 - Numbers 1-10 written as words are not checked; ordinal list markers ("1.") are ignored.
 - ``age`` tokens followed by "ans" without an age context are durations ("sur 5 ans") and fall
   back to plain matching; "year-old", "age of", "aged", "âge", "vous avez" are strict.
@@ -58,9 +62,9 @@ _PATTERN = re.compile(
     rf"(?P<pre>(?:€|EUR|eur)[{_SP}]?)?"
     r"(?P<sign>[-−+](?=\d))?"
     rf"(?P<body>{_BODY})"
-    rf"(?P<mult>[{_SP}]?(?:thousand|milliards?|millions?|mille|billion|mln|Mrds?|Mds?|Mio|bn|mn|M|m|k|K)"
+    rf"(?P<mult>[{_SP}]?(?:thousand|hundreds?|centaines?|milliers?|milliards?|millions?|mille|billion|mln|Mrds?|Mds?|Mio|bn|mn|M|m|k|K)"
     r"(?![A-Za-z]))?"
-    rf"(?:(?P<post>[{_SP}]?(?:%|pour[{_SP}]?cent|per[{_SP}]?cent|percent|pct|pp|pts?|points?"
+    rf"(?:(?P<post>[{_SP}]?(?:%|points?[{_SP}]de[{_SP}]base|basis[{_SP}]points?|bps?|pour[{_SP}]?cent|per[{_SP}]?cent|percent|pct|pp|pts?|points?"
     r"|€|EUR|eur|euros?)(?![A-Za-z]))"
     rf"|(?P<age>[{_SP}-]?(?:years?[ -]old|ans)(?![A-Za-z]))"
     rf"|(?P<dur>[{_SP}-]?(?:years?|yrs?|y|ans?|mois|months?)(?![A-Za-z]))"
@@ -73,6 +77,12 @@ _ORDINAL = re.compile(
 )
 _MULT = {
     "k": 1e3,
+    "hundred": 1e2,
+    "hundreds": 1e2,
+    "centaine": 1e2,
+    "centaines": 1e2,
+    "millier": 1e3,
+    "milliers": 1e3,
     "thousand": 1e3,
     "mille": 1e3,
     "m": 1e6,
@@ -149,6 +159,8 @@ def _scan(text: str, lang: str) -> tuple[list[NumberToken], list[tuple[int, int]
             kind = "eur"
         elif post:
             kind = "percent"
+            if re.match(rf"bps?$|basis|points?[{_SP}]de[{_SP}]base", post):
+                value, decimals = value / 100, decimals + 2  # basis points -> percent
         elif m.group("age"):
             if re.search(r"year", m.group("age")) or _age_context(text, m):
                 kind = "age"
@@ -342,7 +354,7 @@ def _uncovered(block: str, tokens, ignored, words: set[str]) -> list[str]:
     return bad
 
 
-def _goal_names(goals: list) -> list[list[re.Pattern]]:
+def _goal_names(goals: list, with_ids: bool) -> list[list[re.Pattern]]:
     out = []
     for g in goals:
         pats = []
@@ -350,7 +362,7 @@ def _goal_names(goals: list) -> list[list[re.Pattern]]:
             for key in ("label", "label_fr"):
                 if g.get(key):
                     pats.append(re.compile(re.escape(_apos(str(g[key]))), re.IGNORECASE))
-            if g.get("goal_id"):
+            if with_ids and g.get("goal_id"):
                 pats.append(
                     re.compile(rf"(?<![\w]){re.escape(str(g['goal_id']))}(?![\w])", re.IGNORECASE)
                 )
@@ -378,19 +390,21 @@ def verify(
     global_allowed = _collect([facts])
     non_goal = {k: v for k, v in facts.items() if k != "goals"}
     scoped = [_collect([non_goal, g]) for g in goals]
-    names = _goal_names(goals)
+    names = _goal_names(goals, with_ids=False)
+    heading_names = _goal_names(goals, with_ids=True)
 
-    def named(line: str) -> list[int]:
+    def named(line: str, heading: bool) -> list[int]:
         flat = _apos(line)
-        return [i for i, pats in enumerate(names) if any(p.search(flat) for p in pats)]
+        pool = heading_names if heading else names
+        return [i for i, pats in enumerate(pool) if any(p.search(flat) for p in pats)]
 
     errors: list[str] = []
     scope: tuple[int, int] | None = None  # (goal index, heading level)
     for line in text.splitlines():
         if not line.strip():
             continue
-        hits = named(line)
         stripped = line.lstrip()
+        hits = named(line, stripped.startswith("#"))
         if stripped.startswith("#"):
             level = len(stripped) - len(stripped.lstrip("#"))
             if len(hits) == 1:

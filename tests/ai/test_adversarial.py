@@ -39,20 +39,38 @@ def test_real_tickers_and_percentiles_allowed(facts):
 
 
 def test_goal_scoping(facts):
-    # 98.0 % / 2040 are not studies facts; goal_year 2030 belongs to studies
-    ok = "The studies goal is due in 2030."
-    assert verify(ok, "en", facts) == []
-    assert verify("The studies goal has a 98.0 % chance.", "en", facts) != []
-    assert verify("The studies goal is due in 2040.", "en", facts) != []
-    ret = facts["goals"][1]
-    other = f"The studies goal reaches {ret['probability_pct']} %."
-    assert ret["probability_pct"] != facts["goals"][0]["probability_pct"]
-    assert verify(other, "en", facts) != []
+    g0, ret = facts["goals"][0], facts["goals"][1]
+    lab, rlab = g0["label"], ret["label"]
+    assert verify(f"## {lab}\nDue in {g0['goal_year']}.", "en", facts) == []
+    assert verify(f"## {lab}\nThe goal has a 98.0 % chance.", "en", facts) != []
+    assert verify(f"## {lab}\nDue in {ret['goal_year']}.", "en", facts) != []
+    assert verify(f"The {lab} goal reaches {ret['probability_pct']} %.", "en", facts) != []
     # same sentence without goal naming uses global matching
     assert verify(f"The chance is {ret['probability_pct']} %.", "en", facts) == []
-    # heading scoping
-    text = f"## Studies\n- chance {ret['probability_pct']} %"
-    assert verify(text, "en", facts) != []
+    assert verify(f"## {lab}\n- chance {ret['probability_pct']} %", "en", facts) != []
+    # a body line naming another goal by label scopes to that goal
+    assert verify(f"## {lab}\n{rlab}: {ret['probability_pct']} %.", "en", facts) == []
+
+
+def test_goal_id_word_in_body_does_not_rescope(facts):
+    g0 = facts["goals"][0]
+    text = (
+        f"## {g0['label']}\nThis money is kept apart from your retirement savings and has a "
+        f"{g0['probability_pct']} % chance of reaching €{g0['target_nominal_eur']:,}."
+    )
+    assert verify(text, "en", facts) == []
+    # the id still scopes a heading
+    ret = facts["goals"][1]
+    assert verify(f"## Retirement\n- p {g0['probability_pct']} %", "en", facts) != []
+    assert ret["goal_id"] == "retirement"
+
+
+def test_hundred_and_milliers_and_bp(facts):
+    assert verify("15 hundred euros a month", "en", facts) != []
+    assert verify("5 milliers d'euros", "fr", facts) != []
+    assert verify("3 centaines d'euros", "fr", facts) != []
+    assert verify("50 bp", "en", facts) != []
+    assert verify("20 points de base", "fr", facts) != []
 
 
 def test_signs(facts):
