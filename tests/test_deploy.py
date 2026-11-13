@@ -56,3 +56,11 @@ def test_ai_cache_has_every_sample_document():
                     if not (CACHE / f"{cache_key(facts, dt, lang, version)}.json").exists():
                         missing.append(f"{c.client_id} {dt}/{lang}")
     assert not missing, missing
+
+
+def test_pipeline_commands_name_the_ingest_subcommand():
+    make = (ROOT / "Makefile").read_text()
+    recipe = make.split("pipeline:", 1)[1].splitlines()[1]
+    assert recipe.strip().endswith("python -m wealthadvisor.pipeline ingest")
+    page = (ROOT / "app" / "pages" / "4_Data_quality.py").read_text()
+    assert "python -m wealthadvisor.pipeline ingest" in page

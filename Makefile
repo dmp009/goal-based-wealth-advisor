@@ -12,7 +12,7 @@ lint:
 	$(BIN)ruff check .
 
 pipeline:
-	$(BIN)python -m wealthadvisor.pipeline
+	$(BIN)python -m wealthadvisor.pipeline ingest
 
 app:
 	$(BIN)streamlit run app/Home.py
