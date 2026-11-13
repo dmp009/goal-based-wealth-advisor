@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from wealthadvisor.clients.models import Client
 from wealthadvisor.config import load_questionnaire
+from wealthadvisor.i18n import Msg
 
 DAYS_PER_YEAR = 365.25
 KNOWLEDGE_FAMILIES = ("etf_equity", "etf_bond", "structured")
@@ -19,6 +20,8 @@ class ProfileResult(BaseModel):
     rules_fired: list[str]
     knowledge: dict[str, bool]
     constraints: list[str] = []  # every applicable cap, binding or not
+    rules_fired_msgs: list[Msg] = []  # same sentences as code + params (PDF translation)
+    constraints_msgs: list[Msg] = []
 
 
 def client_horizon_years(client: Client, today: date) -> float:
@@ -54,42 +57,35 @@ def score_profile(client: Client, today: date) -> ProfileResult:
 
     rules: list[str] = []
     constraints: list[str] = []
+    rule_msgs: list[Msg] = []
+    constraint_msgs: list[Msg] = []
 
-    def cap(limit: int, sentence: str) -> None:
+    def cap(limit: int, code: str, **params) -> None:
         nonlocal profile
+        msg = Msg(code=code, params={**params, "cap": limit})
         if profile > limit:
-            rules.append(sentence)
-            constraints.append(sentence)
+            rules.append(msg.render("en"))
+            rule_msgs.append(msg)
             profile = limit
         else:
-            constraints.append(f"{sentence.rstrip('.')} (not binding, profile already {profile}).")
+            msg = Msg(code=code, params={**msg.params, "not_binding": profile})
+        constraints.append(msg.render("en"))
+        constraint_msgs.append(msg)
 
     if horizon < 3:
-        cap(
-            caps["horizon_lt_3y"],
-            f"Longest goal horizon is {horizon:.1f} years (less than 3 years): "
-            f"profile capped at {caps['horizon_lt_3y']}.",
-        )
+        cap(caps["horizon_lt_3y"], "cap.horizon_lt_3y", horizon=horizon)
     elif horizon <= 5:
-        cap(
-            caps["horizon_3_to_5y"],
-            f"Longest goal horizon is {horizon:.1f} years (3 to 5 years): "
-            f"profile capped at {caps['horizon_3_to_5y']}.",
-        )
+        cap(caps["horizon_3_to_5y"], "cap.horizon_3_to_5y", horizon=horizon)
     if client.answers["loss_capacity"] == "low":
-        cap(
-            caps["loss_capacity_low"],
-            f"Loss capacity is low: profile capped at {caps['loss_capacity_low']}.",
-        )
+        cap(caps["loss_capacity_low"], "cap.loss_capacity_low")
     if not knowledge["etf_equity"]:
-        cap(
-            caps["no_equity_etf_knowledge"],
-            f"No knowledge of equity ETFs: profile capped at {caps['no_equity_etf_knowledge']}.",
-        )
+        cap(caps["no_equity_etf_knowledge"], "cap.no_equity_etf_knowledge")
     return ProfileResult(
         profile=profile,
         raw_score=round(raw, 4),
         rules_fired=rules,
         knowledge=knowledge,
         constraints=constraints,
+        rules_fired_msgs=rule_msgs,
+        constraints_msgs=constraint_msgs,
     )

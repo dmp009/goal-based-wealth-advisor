@@ -90,3 +90,32 @@ def test_review_pdf_verified_letter_accents(review_built):
     assert "Chère cliente" in text
     bad = Document("review_client", "en", "T", "SECRETBODY", "k", False, ["x"])
     assert "SECRETBODY" not in _text(review_pdf(r, facts, {"en": bad}, "en"))
+
+
+def _proposal_text(cid: str, lang: str) -> str:
+    client = next(c for c in list_sample_clients() if c.client_id == cid)
+    p = build_proposal(client, load_snapshot())
+    return _text(proposal_pdf(p, proposal_facts(p), {}, lang)).replace("\n", " ")
+
+
+@pytest.mark.parametrize("cid", ["c1", "c3"])
+def test_french_proposal_pdf_has_no_english_engine_text(cid):
+    text = _proposal_text(cid, "fr")
+    for en in (
+        "Structured products require",
+        "Longest goal horizon",
+        "Autocall on the Euro",
+        "profile capped",
+        "Issuer credit risk",
+    ):
+        assert en not in text, en
+
+
+def test_french_review_pdf_has_no_english_asset_classes(review_built):
+    from wealthadvisor.outputs.pdf import review_pdf
+
+    r, facts = review_built
+    text = _text(review_pdf(r, facts, {}, "fr")).replace("\n", " ")
+    for en in ("equity world", "safe", "equity europe"):
+        assert en not in text, en
+    assert "Actions monde" in text or "Actifs sécurisés" in text

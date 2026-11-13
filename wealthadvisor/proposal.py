@@ -49,6 +49,7 @@ from wealthadvisor.config import (
 )
 from wealthadvisor.data.warehouse import connect, monthly_returns, upsert
 from wealthadvisor.goals.montecarlo import GoalResult, simulate_bucket
+from wealthadvisor.i18n import Msg, product_name
 from wealthadvisor.portfolio.optimise import OptResult, optimise
 from wealthadvisor.portfolio.riskmodel import covariance, expected_returns, portfolio_stats
 from wealthadvisor.structured.payoff import StructuredDecision, structured_allocation
@@ -60,11 +61,6 @@ METHODS = ("markowitz", "black_litterman", "hrp")
 WRAPPERS = ("livret_a", "pea", "av", "cto")
 TOP_HOLDINGS = 5
 _EPS = 0.005  # amounts below half a cent are dropped from holdings
-_PRODUCT_NAMES = {"livret_a": "Livret A", "fonds_euros": "Fonds en euros"}
-_STRUCTURED_NAMES = {
-    "autocall": "Autocall on the Euro Stoxx 50",
-    "capital_protected_note": "Capital-protected note on the Euro Stoxx 50",
-}
 
 
 @dataclass
@@ -93,6 +89,7 @@ class Proposal:
     client: Client | None = None
     suitability: dict[str, Suitability] = field(default_factory=dict)
     structured_warnings: list[str] = field(default_factory=list)
+    structured_warning_msgs: list[Msg] = field(default_factory=list)
 
 
 def projected_value(bucket: Bucket, annual_return: float) -> float:
@@ -225,6 +222,7 @@ def build_proposal(
 
     longest = max(plan.buckets, key=lambda b: b.horizon_years) if plan.buckets else None
     structured_warnings: list[str] = []
+    structured_warning_msgs: list[Msg] = []
     out: list[BucketProposal] = []
     for b in plan.buckets:
         bucket = replace(b, rules=list(b.rules))
@@ -234,21 +232,23 @@ def build_proposal(
             carve = min(structured.amount, max(0.0, risky))
             min_ticket = load_structured().get("min_ticket_eur", 1000)
             if carve < min_ticket:
-                note = f"Product {structured.product_id} chosen"
-                reasons = [r for r in structured.reasons if not r.startswith(note)]
-                reasons.append(
-                    "The longest-horizon bucket has no risky sleeve large enough to fund a "
-                    f"structured product (minimum {min_ticket:,.0f} EUR)."
-                )
+                msgs = [m for m in structured.reason_msgs if m.code != "structured.chosen"]
+                msgs.append(Msg(code="structured.too_small", params={"min_ticket": min_ticket}))
                 structured = replace(
-                    structured, included=False, amount=0.0, payoff=None, reasons=reasons
+                    structured,
+                    included=False,
+                    amount=0.0,
+                    payoff=None,
+                    reasons=[m.render("en") for m in msgs],
+                    reason_msgs=msgs,
                 )
                 carve = 0.0
             elif carve < structured.amount - _EPS:
-                structured_warnings.append(
-                    f"Structured amount reduced from {structured.amount:,.0f} EUR to "
-                    f"{carve:,.0f} EUR: the longest-horizon bucket's risky sleeve is smaller."
+                msg = Msg(
+                    code="structured.reduced", params={"before": structured.amount, "after": carve}
                 )
+                structured_warning_msgs.append(msg)
+                structured_warnings.append(msg.render("en"))
                 structured = replace(structured, amount=carve)
             if structured.included:
                 bucket.rules.append(
@@ -323,6 +323,7 @@ def build_proposal(
         client=client,
         suitability=suitability,
         structured_warnings=structured_warnings,
+        structured_warning_msgs=structured_warning_msgs,
     )
 
 
@@ -337,15 +338,17 @@ def _pct(x: float) -> float:
     return round(float(x) * 100, 1)
 
 
-def _product_name(product: str, names: dict[str, str]) -> str:
+def _product_name(product: str, names: dict[str, str], lang: str = "en") -> str:
     if product.startswith("structured:"):
-        return _structured_name(product.split(":", 1)[1])
-    return _PRODUCT_NAMES.get(product) or names.get(product, product)
+        return _structured_name(product.split(":", 1)[1], lang)
+    if product in ("livret_a", "fonds_euros"):
+        return product_name(product, lang)
+    return names.get(product, product)
 
 
-def _structured_name(product_id: str | None) -> str:
+def _structured_name(product_id: str | None, lang: str = "en") -> str:
     tpl = load_structured()["templates"].get(product_id or "", {})
-    return _STRUCTURED_NAMES.get(tpl.get("kind", ""), product_id or "")
+    return product_name(tpl.get("kind", ""), lang, default=product_id or "")
 
 
 def _wrapper_eur(holdings: dict[str, dict[str, float]]) -> dict[str, int]:

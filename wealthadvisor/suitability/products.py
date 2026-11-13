@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from wealthadvisor.clients.models import Client
 from wealthadvisor.config import load_structured
+from wealthadvisor.i18n import Msg
 from wealthadvisor.suitability.scoring import ProfileResult
 
 FAMILIES = ("livret_a", "fonds_euros", "etf_bond", "etf_equity", "structured")
@@ -15,16 +16,25 @@ class Suitability(BaseModel):
     included: bool
     reasons: list[str]
     warnings: list[str] = []
+    reason_msgs: list[Msg] = []  # same sentences as code + params (PDF translation)
+    warning_msgs: list[Msg] = []
 
 
-def _knowledge_warning(client: Client, family: str, label: str) -> list[str]:
+def _suit(included: bool, reasons: list[Msg], warnings: list[Msg] | None = None) -> Suitability:
+    warnings = warnings or []
+    return Suitability(
+        included=included,
+        reasons=[m.render("en") for m in reasons],
+        warnings=[m.render("en") for m in warnings],
+        reason_msgs=reasons,
+        warning_msgs=warnings,
+    )
+
+
+def _knowledge_warning(client: Client, family: str, label: str) -> list[Msg]:
     if client.answers.get(family, "none") != "none":
         return []
-    msg = (
-        f"Client declares no knowledge of {label}: appropriateness warning, "
-        "the advisor must explain the risks before investing."
-    )
-    return [msg]
+    return [Msg(code="suit.no_knowledge", params={"label": label})]
 
 
 def check_product(
@@ -34,45 +44,40 @@ def check_product(
         raise ValueError(f"unknown product family {product_family!r}")
     p = profile.profile
     if product_family in ("livret_a", "fonds_euros"):
-        return Suitability(
-            included=True, reasons=["Capital-guaranteed product, suitable for every profile."]
-        )
+        return _suit(True, [Msg(code="suit.guaranteed")])
     if product_family == "etf_bond":
-        return Suitability(
-            included=True,
-            reasons=[f"Bond ETFs are allowed from profile 1 (client profile {p})."],
-            warnings=_knowledge_warning(client, "etf_bond", "bond ETFs"),
+        return _suit(
+            True,
+            [Msg(code="suit.bond_allowed", params={"p": p})],
+            _knowledge_warning(client, "etf_bond", "bond ETFs"),
         )
     if product_family == "etf_equity":
         if p >= 2:
-            return Suitability(
-                included=True,
-                reasons=[f"Equity ETFs are allowed from profile 2 (client profile {p})."],
-                warnings=_knowledge_warning(client, "etf_equity", "equity ETFs"),
+            return _suit(
+                True,
+                [Msg(code="suit.equity_allowed", params={"p": p})],
+                _knowledge_warning(client, "etf_equity", "equity ETFs"),
             )
-        return Suitability(
-            included=False,
-            reasons=[f"Equity ETFs require profile 2 or higher (client profile {p})."],
-        )
+        return _suit(False, [Msg(code="suit.equity_requires", params={"p": p})])
 
     elig = load_structured()["eligibility"]
-    reasons = []
+    reasons: list[Msg] = []
     if p < elig["min_profile"]:
         reasons.append(
-            f"Structured products require profile {elig['min_profile']} or higher (client profile {p})."
+            Msg(
+                code="suit.structured_min_profile",
+                params={"min_profile": elig["min_profile"], "p": p},
+            )
         )
     if horizon_years < elig["min_horizon_years"]:
         reasons.append(
-            f"Structured products require a horizon of at least {elig['min_horizon_years']} years "
-            f"(client horizon {horizon_years:.1f} years)."
+            Msg(
+                code="suit.structured_min_horizon",
+                params={"min_years": elig["min_horizon_years"], "horizon": horizon_years},
+            )
         )
     if client.answers.get("structured", "none") == "none":
-        reasons.append("The client declares no knowledge of structured products.")
+        reasons.append(Msg(code="suit.structured_no_knowledge"))
     if reasons:
-        return Suitability(included=False, reasons=reasons)
-    return Suitability(
-        included=True,
-        reasons=[
-            "Profile, horizon and declared knowledge all meet the structured-product conditions."
-        ],
-    )
+        return _suit(False, reasons)
+    return _suit(True, [Msg(code="suit.structured_ok")])

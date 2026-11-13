@@ -17,7 +17,9 @@ from reportlab.lib.units import cm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from wealthadvisor.ai.documents import Document
-from wealthadvisor.config import load_settings
+from wealthadvisor.config import load_etfs, load_settings
+from wealthadvisor.i18n import asset_class_label, render
+from wealthadvisor.proposal import _product_name, _structured_name
 
 NAVY = colors.HexColor("#1f3a5f")
 _METHOD = {"markowitz": "Markowitz", "black_litterman": "Black-Litterman", "hrp": "HRP"}
@@ -175,6 +177,11 @@ def _pct(x: float, lang: str) -> str:
     return (s.replace(".", ",") if lang == "fr" else s) + " %" if lang == "fr" else s + "%"
 
 
+def _trade_name(trade: dict, lang: str) -> str:
+    names = {e.ticker: e.name for e in load_etfs()}
+    return _product_name(trade["product"], names, lang)
+
+
 def _letter_flowables(doc: Document, styles) -> list:
     out = [_p(doc.title, styles["h3"]), Spacer(1, 4)]
     for raw in doc.body.split("\n"):
@@ -276,7 +283,7 @@ def review_pdf(review, facts: dict, documents: dict, lang: str) -> bytes:
     for d in facts["drift"]:
         rows.append(
             [
-                d["asset_class"].replace("_", " "),
+                asset_class_label(d["asset_class"], lang),
                 _pct(d["target_pct"], lang),
                 _pct(d["current_pct"], lang),
                 _pct(d["diff_pct"], lang),
@@ -317,7 +324,7 @@ def review_pdf(review, facts: dict, documents: dict, lang: str) -> bytes:
             rows.append(
                 [
                     w[lang] if isinstance(w, dict) else w,
-                    Paragraph(escape(_clean(tr["name"])), styles["cell"]),
+                    Paragraph(escape(_clean(_trade_name(tr, lang))), styles["cell"]),
                     t["r_buy"] if tr["action"] == "buy" else t["r_sell"],
                     _eur(tr["amount_eur"], lang),
                     t["r_yes"] if tr["taxable"] else t["r_no"],
@@ -354,7 +361,10 @@ def proposal_pdf(proposal, facts: dict, documents: dict, lang: str) -> bytes:
         _p(f"{t['profile']}: {facts['profile']['risk_profile_count']} {t['of7']}", styles["h2"]),
         _p(t["rules"], styles["h3"]),
     ]
-    rules = facts["profile"]["rules_fired"]
+    if proposal is not None:
+        rules = [render(m, lang) for m in proposal.profile.rules_fired_msgs]
+    else:
+        rules = facts["profile"]["rules_fired"]
     for r in rules or [t["none"]]:
         story.append(_p("- " + r, styles["body"]))
 
@@ -388,23 +398,30 @@ def proposal_pdf(proposal, facts: dict, documents: dict, lang: str) -> bytes:
 
     # structured
     s = facts["structured"]
+    sd = proposal.structured if proposal is not None else None
     story.append(_p(t["structured"], styles["h2"]))
     if s["included"]:
-        story.append(
-            _p(
-                f"{t['included']}: {s['product_name']} - {_eur(s['amount_eur'], lang)}",
-                styles["body"],
-            )
-        )
+        name = _structured_name(s["product_id"], lang) if sd is not None else s["product_name"]
+        story.append(_p(f"{t['included']}: {name} - {_eur(s['amount_eur'], lang)}", styles["body"]))
         if "prob_capital_loss_pct" in s:
             story.append(
                 _p(f"{t['loss']}: {_pct(s['prob_capital_loss_pct'], lang)}", styles["body"])
             )
-        if s.get("describe"):
+        if sd is not None and sd.payoff is not None and sd.payoff.describe_msg is not None:
+            story.append(_p(render(sd.payoff.describe_msg, lang), styles["small"]))
+        elif s.get("describe"):
             story.append(_p(s["describe"], styles["small"]))
+        warnings = (
+            [render(m, lang) for m in proposal.structured_warning_msgs]
+            if proposal is not None
+            else s.get("warnings", [])
+        )
+        for w in warnings:
+            story.append(_p("- " + w, styles["small"]))
     else:
         story.append(_p(t["excluded"], styles["body"]))
-        for r in s["reasons"]:
+        reasons = [render(m, lang) for m in sd.reason_msgs] if sd is not None else s["reasons"]
+        for r in reasons:
             story.append(_p("- " + r, styles["small"]))
 
     # letter

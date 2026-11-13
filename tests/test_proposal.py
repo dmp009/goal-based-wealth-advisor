@@ -277,20 +277,20 @@ def _small_sleeve_client():
         original_proposal=None,
         proposal_date=None,
         goals=[
-            dict(
-                goal_id="home",
-                label="Home deposit",
-                target_today_eur=80000,
-                date=date(2031, 10, 31),
-                priority="essential",
-            ),
-            dict(
-                goal_id="ret",
-                label="Retirement",
-                target_today_eur=150000,
-                date=date(2046, 10, 31),
-                priority="aspirational",
-            ),
+            {
+                "goal_id": "home",
+                "label": "Home deposit",
+                "target_today_eur": 80000,
+                "date": date(2031, 10, 31),
+                "priority": "essential",
+            },
+            {
+                "goal_id": "ret",
+                "label": "Retirement",
+                "target_today_eur": 150000,
+                "date": date(2046, 10, 31),
+                "priority": "aspirational",
+            },
         ],
     )
     from wealthadvisor.clients.models import Client

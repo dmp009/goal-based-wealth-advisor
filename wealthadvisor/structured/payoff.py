@@ -27,6 +27,7 @@ import numpy as np
 
 from wealthadvisor.clients.models import Client
 from wealthadvisor.config import load_cma, load_settings, load_structured
+from wealthadvisor.i18n import Msg
 from wealthadvisor.suitability.products import check_product
 from wealthadvisor.suitability.scoring import ProfileResult
 from wealthadvisor.wrappers.allocate import BucketPlan
@@ -43,6 +44,11 @@ class PayoffResult:
     expected_multiple: float
     describe: str
     annualised_expected_return: float = 0.0
+    describe_msg: Msg | None = None  # ``describe`` as code + params
+
+    @property
+    def describe_fr(self) -> str:
+        return self.describe_msg.render("fr") if self.describe_msg else self.describe
 
 
 @dataclass
@@ -53,6 +59,7 @@ class StructuredDecision:
     wrapper: Literal["av", "cto"]
     reasons: list[str] = field(default_factory=list)
     payoff: PayoffResult | None = None
+    reason_msgs: list[Msg] = field(default_factory=list)  # ``reasons`` as code + params
 
 
 def simulate_index(
@@ -94,28 +101,33 @@ def autocall_payoff(
     loss = float(np.mean(~called & (final < barrier)))
     life = np.where(called, first, years)
     drop = round((1 - barrier) * 100)
-    describe = (
-        f"{years}-year autocall on the Euro Stoxx 50: if the index is at or above "
-        f"{autocall_level * 100:.0f} % of its start on an annual observation date, the product "
-        f"is called early and pays {coupon * 100:.1f} % per elapsed year. Otherwise capital is "
-        f"repaid at maturity unless the index has fallen more than {drop} %, in which case the "
-        f"investor bears the full index loss. Issuer credit risk applies."
+    msg = Msg(
+        code="structured.describe_autocall",
+        params={
+            "years": years,
+            "autocall": autocall_level * 100,
+            "coupon": coupon * 100,
+            "drop": drop,
+        },
     )
-    return PayoffResult(pay, first, loss, float(pay.mean()), describe, _annualised(pay, life))
+    return PayoffResult(
+        pay, first, loss, float(pay.mean()), msg.render("en"), _annualised(pay, life), msg
+    )
 
 
 def cpn_payoff(levels: np.ndarray, participation: float) -> PayoffResult:
     years = levels.shape[1] - 1
     final = levels[:, -1] / levels[:, 0]
     pay = 1.0 + participation * np.maximum(0.0, final - 1.0)
-    describe = (
-        f"{years}-year note: 100 % of capital repaid at maturity plus {participation * 100:.0f} % "
-        f"of any rise in the Euro Stoxx 50 (price index, dividends not included). "
-        f"Issuer credit risk applies."
+    msg = Msg(
+        code="structured.describe_cpn",
+        params={"years": years, "participation": participation * 100},
     )
     called = np.full(levels.shape[0], years)
     life = np.full(levels.shape[0], years)
-    return PayoffResult(pay, called, 0.0, float(pay.mean()), describe, _annualised(pay, life))
+    return PayoffResult(
+        pay, called, 0.0, float(pay.mean()), msg.render("en"), _annualised(pay, life), msg
+    )
 
 
 def structured_allocation(
@@ -125,7 +137,9 @@ def structured_allocation(
     horizon = max((b.horizon_years for b in bucket_plan.buckets), default=0.0)
     suit = check_product("structured", client, profile, horizon)
     if not suit.included:
-        return StructuredDecision(False, None, 0.0, "cto", list(suit.reasons), None)
+        return StructuredDecision(
+            False, None, 0.0, "cto", list(suit.reasons), None, list(suit.reason_msgs)
+        )
 
     product_id = "autocall_sx5e" if profile.profile >= 5 else "cpn_sx5e"
     tpl = cfg["templates"][product_id]
@@ -142,9 +156,14 @@ def structured_allocation(
         payoff = autocall_payoff(levels, tpl["coupon"], tpl["barrier"], tpl["autocall_level"])
     else:
         payoff = cpn_payoff(levels, tpl["participation"])
-    note = (
-        f"Product {product_id} chosen for profile {profile.profile}; amount capped at "
-        f"{cfg['max_share'] * 100:.0f} % of investable assets after the emergency fund."
+    note = Msg(
+        code="structured.chosen",
+        params={
+            "product_id": product_id,
+            "profile": profile.profile,
+            "share": cfg["max_share"] * 100,
+        },
     )
-    reasons = [*suit.reasons, note]
-    return StructuredDecision(True, product_id, float(amount), wrapper, reasons, payoff)
+    msgs = [*suit.reason_msgs, note]
+    reasons = [m.render("en") for m in msgs]
+    return StructuredDecision(True, product_id, float(amount), wrapper, reasons, payoff, msgs)
