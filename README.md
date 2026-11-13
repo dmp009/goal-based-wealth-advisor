@@ -266,6 +266,15 @@ python -m wealthadvisor.pipeline ai --refresh    # generate, verify and cache th
 Other targets: `make test`, `make lint`, `make readme` (refresh the results tables above) and
 `make figures` (regenerate the README images).
 
+### Deploying on Streamlit Community Cloud
+
+Point the app at `app/Home.py`. Cloud installs `requirements.txt`, which pins every runtime
+dependency to the exact version the test suite passed with, then installs the package itself.
+Those pins need Python 3.12 or later: choose **Python 3.13** under *Advanced settings* when
+creating the app (`runtime.txt` records the same version). To show the AI letters, generate
+and commit `data/ai_cache/` first (`python -m wealthadvisor.pipeline ai --refresh` with an API
+key); the app never calls the API itself.
+
 ## Project structure
 
 ```

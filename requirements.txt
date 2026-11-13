@@ -1,16 +1,18 @@
-pandas>=2.2
-numpy>=1.26
-scipy>=1.11
-PyPortfolioOpt>=1.5,<2
-scikit-learn>=1.4
-yfinance>=0.2.40
-duckdb>=1.1
-pandera>=0.24
-pydantic>=2
-pyyaml>=6
-anthropic>=0.40
-reportlab>=4
-plotly>=5.20
-streamlit>=1.50
-requests>=2.31
+# Runtime dependencies pinned to the versions the test suite passed with (Python 3.13).
+# Loose ranges live in pyproject.toml; this file is what Streamlit Community Cloud installs.
+anthropic==2.8.0
+duckdb==2.0.0
+numpy==2.5.4
+pandas==3.1.1
+pandera==0.36.0
+plotly==7.1.0
+pydantic==2.14.3
+PyPortfolioOpt==1.6.0
+PyYAML==6.0.3
+reportlab==5.1.0
+requests==2.34.2
+scikit-learn==1.9.1
+scipy==1.18.1
+streamlit==1.67.0
+yfinance==1.8.0
 .
