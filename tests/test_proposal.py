@@ -264,3 +264,48 @@ def test_save_proposal_roundtrip(proposals):
         ["c2"],
     ).fetchone()
     assert json.loads(row[0]) == proposal_facts(p)
+
+
+def _small_sleeve_client():
+    """Structured-eligible client whose longest goal is funded only by monthly saving."""
+    base = CLIENTS["c3"].model_dump()
+    base.update(
+        client_id="small",
+        liquid_assets=80000,
+        monthly_saving=1000,
+        monthly_expenses=2000,
+        original_proposal=None,
+        proposal_date=None,
+        goals=[
+            dict(
+                goal_id="home",
+                label="Home deposit",
+                target_today_eur=80000,
+                date=date(2031, 10, 31),
+                priority="essential",
+            ),
+            dict(
+                goal_id="ret",
+                label="Retirement",
+                target_today_eur=150000,
+                date=date(2046, 10, 31),
+                priority="aspirational",
+            ),
+        ],
+    )
+    from wealthadvisor.clients.models import Client
+
+    return Client.model_validate(base)
+
+
+def test_structured_not_included_when_sleeve_below_minimum_ticket(con):
+    p = build_proposal(_small_sleeve_client(), con)
+    longest = max(p.buckets, key=lambda bp: bp.bucket.horizon_years)
+    assert longest.bucket.funding_now * (1 - longest.bucket.safe_share) < 1000
+    s = p.structured
+    assert not s.included and s.amount == 0 and s.payoff is None
+    assert any("minimum 1,000 EUR" in r for r in s.reasons)
+    assert not any(k.startswith("structured:") for prods in p.totals.values() for k in prods)
+    assert not any("Structured product" in r for bp in p.buckets for r in bp.bucket.rules)
+    f = proposal_facts(p)["structured"]
+    assert f["included"] is False and "product_name" not in f

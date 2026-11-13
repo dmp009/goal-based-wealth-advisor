@@ -13,6 +13,7 @@ templates:
     participation: 0.5
 dividend_yield: 0.03       # Euro Stoxx 50 is a price index; GBM drift = CMA return - dividend yield
 max_share: 0.15            # of investable assets after the emergency fund
+min_ticket_eur: 1000       # below this carve, no structured product is proposed
 eligibility:
   min_profile: 4
   min_horizon_years: 8

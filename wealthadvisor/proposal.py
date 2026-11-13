@@ -15,7 +15,8 @@ Documented conventions:
   to the split's PEA amount (pro rata across equity ETFs), overflow to AV (horizon >= 3 y) else
   CTO; bonds -> AV (>= 3 y) else CTO.
 - A structured product, when included, is carved from the longest-horizon bucket's risky sleeve
-  before the ETF amounts are computed. Simplification: that bucket's Monte Carlo still models the
+  before the ETF amounts are computed. If that sleeve is below the minimum ticket
+  (``min_ticket_eur`` in ``config/structured.yaml``), no structured product is proposed. Simplification: that bucket's Monte Carlo still models the
   whole risky sleeve with the chosen ETF weights.
 - Goal Monte Carlo uses the chosen method's weights; safe rate = fonds en euros rate, or the
   Livret A rate when the bucket's safe sleeve is entirely in Livret A. Its tax allocation uses the
@@ -231,17 +232,30 @@ def build_proposal(
         carve = 0.0
         if structured.included and b is longest:
             carve = min(structured.amount, max(0.0, risky))
-            if carve < structured.amount - _EPS:
+            min_ticket = load_structured().get("min_ticket_eur", 1000)
+            if carve < min_ticket:
+                note = f"Product {structured.product_id} chosen"
+                reasons = [r for r in structured.reasons if not r.startswith(note)]
+                reasons.append(
+                    "The longest-horizon bucket has no risky sleeve large enough to fund a "
+                    f"structured product (minimum {min_ticket:,.0f} EUR)."
+                )
+                structured = replace(
+                    structured, included=False, amount=0.0, payoff=None, reasons=reasons
+                )
+                carve = 0.0
+            elif carve < structured.amount - _EPS:
                 structured_warnings.append(
                     f"Structured amount reduced from {structured.amount:,.0f} EUR to "
                     f"{carve:,.0f} EUR: the longest-horizon bucket's risky sleeve is smaller."
                 )
                 structured = replace(structured, amount=carve)
-            bucket.rules.append(
-                f"Structured product {structured.product_id} ({carve:,.0f} EUR) is taken from this "
-                "longest-horizon bucket's risky sleeve before the ETF portfolio is optimised; "
-                f"it is held in {structured.wrapper.upper()}."
-            )
+            if structured.included:
+                bucket.rules.append(
+                    f"Structured product {structured.product_id} ({carve:,.0f} EUR) is taken from "
+                    "this longest-horizon bucket's risky sleeve before the ETF portfolio is "
+                    f"optimised; it is held in {structured.wrapper.upper()}."
+                )
         risky_etf = risky - carve
 
         universe = _universe(bucket, etfs, suitability["etf_equity"].included)
