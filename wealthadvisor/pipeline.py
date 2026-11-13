@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -69,6 +70,39 @@ def ingest(db_path: Path | str, snapshot_dir: Path | str, report_path: Path | st
     logger.info("Ingest done: %d quality issue(s)", len(issues))
 
 
+def ai(
+    client_ids: list[str] | None = None,
+    refresh: bool = False,
+    llm=None,
+    cache_dir: Path | str | None = None,
+) -> list:
+    """Build proposals for the sample clients and generate the 4 proposal documents each."""
+    from wealthadvisor.ai.documents import DEFAULT_CACHE_DIR, generate
+    from wealthadvisor.clients.models import list_sample_clients
+    from wealthadvisor.data.snapshot import load_snapshot
+    from wealthadvisor.proposal import build_proposal, proposal_facts
+
+    clients = [c for c in list_sample_clients() if not client_ids or c.client_id in client_ids]
+    con = load_snapshot()
+    docs = []
+    for c in clients:
+        facts = proposal_facts(build_proposal(c, con))
+        for doc_type in ("proposal_advisor", "proposal_client"):
+            for lang in ("en", "fr"):
+                d = generate(doc_type, lang, facts, llm, refresh, cache_dir or DEFAULT_CACHE_DIR)
+                if d is None:
+                    continue
+                logger.info(
+                    "%s %s/%s: %s",
+                    c.client_id,
+                    doc_type,
+                    lang,
+                    "verified" if d.verified else "UNVERIFIED",
+                )
+                docs.append(d)
+    return docs
+
+
 def _to_rows(ticker: str, series: pd.Series, flags: pd.Series) -> pd.DataFrame:
     return pd.DataFrame(
         {
@@ -87,10 +121,21 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--db", default=REPO_ROOT / "data" / "warehouse.duckdb")
     p.add_argument("--snapshot-dir", default=SNAPSHOT_DIR)
     p.add_argument("--report", default=REPO_ROOT / "data_quality_report.md")
+    a = sub.add_parser("ai", help="generate and verify the AI proposal documents")
+    a.add_argument("--refresh", action="store_true", help="regenerate even when cached")
+    a.add_argument("--clients", default=None, help="comma-separated client ids (default: all)")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     if args.command == "ingest":
         ingest(args.db, args.snapshot_dir, args.report)
+    elif args.command == "ai":
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            logger.warning("ANTHROPIC_API_KEY is not set; skipping AI document generation")
+            return
+        from wealthadvisor.ai.client import AnthropicClient
+
+        ids = [c.strip() for c in args.clients.split(",")] if args.clients else None
+        ai(ids, args.refresh, AnthropicClient())
 
 
 if __name__ == "__main__":
