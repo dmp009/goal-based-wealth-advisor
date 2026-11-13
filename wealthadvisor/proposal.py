@@ -18,7 +18,11 @@ Documented conventions:
   before the ETF amounts are computed. Simplification: that bucket's Monte Carlo still models the
   whole risky sleeve with the chosen ETF weights.
 - Goal Monte Carlo uses the chosen method's weights; safe rate = fonds en euros rate, or the
-  Livret A rate when the bucket's safe sleeve is entirely in Livret A.
+  Livret A rate when the bucket's safe sleeve is entirely in Livret A. Its tax allocation uses the
+  realised wrapper amounts from ``holdings_eur`` (monthly split if the bucket has no funding).
+- ``shortfall_flag`` (facts): the deterministic pre-tax projection at the bucket's expected
+  return is below the nominal target. The Monte Carlo ``underfunded`` flag (no money at all)
+  stays internal.
 
 Facts naming (binding for the AI numeric check): numeric leaves only under keys ending ``_pct``
 (percent units, 1 dp), ``_eur`` (0 dp), ``_year`` (4-digit), ``_count`` (integers) or ``age``.
@@ -71,6 +75,7 @@ class BucketProposal:
     safe_rate: float = 0.0
     expected_return: float = 0.0  # bucket level (safe + risky sleeve), CMA mu
     volatility: float = 0.0  # bucket level
+    shortfall_flag: bool = False  # deterministic projection at expected_return < target
 
 
 @dataclass
@@ -85,6 +90,17 @@ class Proposal:
     client: Client | None = None
     suitability: dict[str, Suitability] = field(default_factory=dict)
     structured_warnings: list[str] = field(default_factory=list)
+
+
+def projected_value(bucket: Bucket, annual_return: float) -> float:
+    """Deterministic pre-tax value at the goal date: funding and month-end contributions
+    compounded at ``annual_return`` over the same month count as the Monte Carlo."""
+    months = max(1, round(bucket.horizon_years * 12))
+    rm = (1 + annual_return) ** (1 / 12) - 1
+    fv = bucket.funding_now * (1 + rm) ** months
+    c = bucket.monthly_contribution
+    fv += c * (((1 + rm) ** months - 1) / rm if abs(rm) > 1e-12 else months)
+    return float(fv)
 
 
 def snapshot_today(con) -> date:
@@ -222,8 +238,10 @@ def build_proposal(
         if carve > _EPS:
             _add(holdings, structured.wrapper, f"structured:{structured.product_id}", carve)
         safe_rate = _safe_rate(bucket, holdings, rates)
+        # Tax at the goal date follows the realised wrapper amounts, not the planned split.
+        realised = {w: sum(prods.values()) for w, prods in holdings.items()}
         goal = simulate_bucket(
-            bucket,
+            replace(bucket, wrapper_split=realised),
             weights,
             mu,
             cov,
@@ -246,6 +264,7 @@ def build_proposal(
                 safe_rate,
                 stats["expected_return"],
                 stats["volatility"],
+                projected_value(bucket, stats["expected_return"]) < bucket.target_nominal,
             )
         )
 
@@ -313,6 +332,7 @@ def _goal_facts(bp: BucketProposal, client: Client | None, names: dict[str, str]
         "priority": goal.priority if goal else "",
         "target_nominal_eur": _eur(b.target_nominal),
         "horizon_years_count": round(float(b.horizon_years)),
+        "horizon_months_count": max(1, round(float(b.horizon_years) * 12)),
         "bucket_risk_count": int(b.risk),
         "safe_share_pct": _pct(b.safe_share),
         "funding_now_eur": _eur(b.funding_now),
@@ -328,7 +348,7 @@ def _goal_facts(bp: BucketProposal, client: Client | None, names: dict[str, str]
         "p10_eur": _eur(bp.goal.p10),
         "p50_eur": _eur(bp.goal.p50),
         "p90_eur": _eur(bp.goal.p90),
-        "underfunded": bool(bp.goal.underfunded),
+        "shortfall_flag": bool(bp.shortfall_flag),
         "wrappers": _wrapper_eur(bp.holdings_eur),
         "top_holdings": [
             {

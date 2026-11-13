@@ -68,6 +68,72 @@ def test_pea_holdings_only_pea_eligible(proposals):
     assert seen_pea, "at least one sample client should use the PEA"
 
 
+def test_regulatory_caps_per_client(proposals):
+    eligible = {e.ticker for e in load_etfs() if e.pea_eligible is True}
+    for cid, p in proposals.items():
+        assert sum(p.totals.get("pea", {}).values()) <= 150_000 + 1.0, cid
+        assert sum(p.totals.get("livret_a", {}).values()) <= 22_950 + 1.0, cid
+        assert set(p.totals.get("pea", {})) <= eligible, cid
+
+
+def test_sample_goal_probabilities_realistic(proposals):
+    for cid, p in proposals.items():
+        for bp in p.buckets:
+            assert 0.0 < bp.goal.probability <= 1.0, (cid, bp.bucket.goal_id)
+    prob = {
+        (cid, bp.bucket.goal_id): bp.goal.probability
+        for cid, p in proposals.items()
+        for bp in p.buckets
+    }
+    assert 0.60 <= prob[("c1", "flat_deposit")] <= 0.85
+    assert 0.25 <= prob[("c3", "holiday_home")] <= 0.65
+
+
+def test_shortfall_flag_and_horizon_months(proposals):
+    from wealthadvisor.proposal import projected_value
+
+    for p in proposals.values():
+        f = proposal_facts(p)
+        for g, bp in zip(f["goals"], p.buckets):
+            b = bp.bucket
+            assert "underfunded" not in g
+            proj = projected_value(b, bp.expected_return)
+            assert g["shortfall_flag"] is (proj < b.target_nominal)
+            assert g["horizon_months_count"] == max(1, round(b.horizon_years * 12))
+            assert g["horizon_years_count"] == round(b.horizon_years)
+
+
+def test_projected_value_hand_computed():
+    from wealthadvisor.proposal import projected_value
+    from wealthadvisor.wrappers.allocate import Bucket
+
+    b = Bucket("g", 1.0, 3, 1000.0, 100.0, 0.0, {}, 0.4, [])
+    rm = 1.12 ** (1 / 12) - 1
+    expected = 1000 * 1.12 + 100 * ((1 + rm) ** 12 - 1) / rm
+    assert projected_value(b, 0.12) == pytest.approx(expected)
+    assert projected_value(b, 0.0) == pytest.approx(1000 + 1200)
+
+
+def test_mc_tax_uses_realised_wrapper_amounts(con, monkeypatch):
+    import wealthadvisor.proposal as mod
+
+    seen = {}
+    real = mod.simulate_bucket
+
+    def spy(bucket, *a, **k):
+        seen[bucket.goal_id] = dict(bucket.wrapper_split)
+        return real(bucket, *a, **k)
+
+    monkeypatch.setattr(mod, "simulate_bucket", spy)
+    p = mod.build_proposal(CLIENTS["c4"], con)
+    for bp in p.buckets:
+        realised = {w: sum(v.values()) for w, v in bp.holdings_eur.items()}
+        assert seen[bp.bucket.goal_id] == pytest.approx(realised)
+    # c4 care_reserve: HRP holds less equity than the planned split, so less goes to the PEA.
+    care = next(bp for bp in p.buckets if bp.bucket.goal_id == "care_reserve")
+    assert seen["care_reserve"]["pea"] < care.bucket.wrapper_split["pea"] - 1.0
+
+
 def test_chosen_weights_respect_equity_cap(proposals):
     profiles = load_profiles()
     etfs = {e.ticker: e for e in load_etfs()}

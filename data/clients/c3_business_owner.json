@@ -26,8 +26,8 @@
     {
       "goal_id": "holiday_home",
       "label": "Holiday home",
-      "target_today_eur": 250000,
-      "date": "2035-06-30",
+      "target_today_eur": 140000,
+      "date": "2038-06-30",
       "priority": "aspirational"
     }
   ],

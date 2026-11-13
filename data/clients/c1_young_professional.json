@@ -12,7 +12,7 @@
     {
       "goal_id": "flat_deposit",
       "label": "Deposit for a first flat",
-      "target_today_eur": 60000,
+      "target_today_eur": 38500,
       "date": "2031-06-30",
       "priority": "essential"
     }
