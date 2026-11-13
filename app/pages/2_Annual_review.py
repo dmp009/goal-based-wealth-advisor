@@ -44,13 +44,18 @@ def _eur(x: float) -> str:
     return f"{x:,.0f} EUR"
 
 
-samples = get_sample_clients()
-choice = st.selectbox("Client", [c.name for c in samples], key="review_client")
-client = next(c for c in samples if c.name == choice)
-if not client.original_proposal:
-    st.info("No existing portfolio for this client — use New client.")
+samples = [c for c in get_sample_clients() if c.original_proposal]
+if not samples:
+    st.info("No client with an existing portfolio — use New client.")
     footer()
     st.stop()
+choice = st.selectbox(
+    "Client",
+    [c.name for c in samples],
+    key="review_client",
+    help="Only clients with an existing portfolio (original proposal) can be reviewed.",
+)
+client = next(c for c in samples if c.name == choice)
 
 # --------------------------------------------------------------------------- re-profile form
 st.header("Re-profile")

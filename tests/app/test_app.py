@@ -3,6 +3,8 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
+from wealthadvisor.clients.models import list_sample_clients
+
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = str(ROOT / "app" / "pages" / "1_New_client.py")
 HOME = str(ROOT / "app" / "Home.py")
@@ -57,9 +59,12 @@ def test_blank_client_form_submits():
 REVIEW = str(ROOT / "app" / "pages" / "2_Annual_review.py")
 
 
+REVIEW_CLIENTS = ["c2", "c3"]  # sample clients with an existing portfolio
+
+
 def _review(client_id):
     at = AppTest.from_file(REVIEW, default_timeout=180).run()
-    at.selectbox(key="review_client").select_index(CLIENTS.index(client_id)).run()
+    at.selectbox(key="review_client").select_index(REVIEW_CLIENTS.index(client_id)).run()
     return at
 
 
@@ -77,11 +82,14 @@ def test_review_c3_no_rebalancing():
     assert any("No rebalancing needed" in i.value for i in at.info)
 
 
-@pytest.mark.parametrize("cid", ["c1", "c4"])
-def test_review_no_portfolio_message(cid):
-    at = _review(cid)
+def test_review_lists_only_clients_with_a_portfolio():
+    at = AppTest.from_file(REVIEW, default_timeout=180).run()
     assert not at.exception, [e.value for e in at.exception]
-    assert any("No existing portfolio for this client" in i.value for i in at.info)
+    names = {c.client_id: c.name for c in list_sample_clients()}
+    assert at.selectbox(key="review_client").options == [names[c] for c in REVIEW_CLIENTS]
+    # the default selection opens a real review, not a dead end
+    assert not any("No existing portfolio" in i.value for i in at.info)
+    assert any("Action" in list(d.value.columns) for d in at.dataframe)
 
 
 def test_review_editing_answer_flips_profile_changed():
