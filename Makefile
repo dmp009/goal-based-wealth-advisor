@@ -15,4 +15,4 @@ pipeline:
 	$(BIN)python -m wealthadvisor.pipeline
 
 app:
-	$(BIN)streamlit run app/Home.py
+	$(BIN)streamlit run app/streamlit_app.py
