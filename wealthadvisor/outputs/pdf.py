@@ -86,7 +86,7 @@ _T = {
         "r_sell": "sell",
         "r_tax": "Taxable",
         "r_esttax": "Est. tax",
-        "r_notrades": "No rebalancing needed: all asset classes are within the target band.",
+        "r_notrades": "No rebalancing needed: all asset classes are within ±{band} pp of target.",
         "r_letter": "Client letter",
         "r_noletter": "No verified client letter is available for this review.",
     },
@@ -147,7 +147,7 @@ _T = {
         "r_sell": "vente",
         "r_tax": "Imposable",
         "r_esttax": "Impôt est.",
-        "r_notrades": "Aucun rééquilibrage nécessaire : toutes les classes d'actifs sont dans la bande cible.",
+        "r_notrades": "Aucun rééquilibrage nécessaire : toutes les classes d'actifs sont à ±{band} pp de la cible.",
         "r_letter": "Lettre au client",
         "r_noletter": "Aucune lettre client vérifiée n'est disponible pour cette revue.",
     },
@@ -326,7 +326,9 @@ def review_pdf(review, facts: dict, documents: dict, lang: str) -> bytes:
             )
         story.append(_table(rows, [2.6 * cm, 5.4 * cm, 1.8 * cm, 2.6 * cm, 1.8 * cm, 2.2 * cm]))
     else:
-        story.append(_p(t["r_notrades"], styles["body"]))
+        story.append(
+            _p(t["r_notrades"].format(band=f"{review.drift_band * 100:g}"), styles["body"])
+        )
 
     story.append(_p(t["r_letter"], styles["h2"]))
     letter = (documents or {}).get(lang)
@@ -343,15 +345,7 @@ def proposal_pdf(proposal, facts: dict, documents: dict, lang: str) -> bytes:
         raise ValueError(f"unsupported language {lang!r}")
     t = _T[lang]
     disclaimer = load_settings().disclaimer[lang]
-    base = getSampleStyleSheet()
-    styles = {
-        "title": ParagraphStyle("t", parent=base["Title"], textColor=NAVY, fontSize=20),
-        "h2": ParagraphStyle("h2", parent=base["Heading2"], textColor=NAVY, spaceBefore=10),
-        "h3": ParagraphStyle("h3", parent=base["Heading3"], textColor=NAVY),
-        "body": ParagraphStyle("b", parent=base["BodyText"], fontSize=9, leading=12),
-        "cell": ParagraphStyle("c", parent=base["BodyText"], fontSize=8.5, leading=10),
-        "small": ParagraphStyle("s", parent=base["BodyText"], fontSize=7.5, leading=9),
-    }
+    styles = _styles()
     c = facts["client"]
     story: list = [
         _p(t["title"], styles["title"]),
@@ -423,22 +417,4 @@ def proposal_pdf(proposal, facts: dict, documents: dict, lang: str) -> bytes:
 
     story += [Spacer(1, 12), _p(disclaimer, styles["small"])]
 
-    def footer(canvas, doc):
-        canvas.saveState()
-        canvas.setFont("Helvetica", 7)
-        canvas.setFillColor(colors.grey)
-        canvas.drawString(2 * cm, 1.2 * cm, _clean(disclaimer))
-        canvas.drawRightString(A4[0] - 2 * cm, 1.2 * cm, f"{t['page']} {doc.page}")
-        canvas.restoreState()
-
-    buf = BytesIO()
-    SimpleDocTemplate(
-        buf,
-        pagesize=A4,
-        leftMargin=2 * cm,
-        rightMargin=2 * cm,
-        topMargin=1.8 * cm,
-        bottomMargin=2 * cm,
-        title=f"{t['title']} - {c['name']}",
-    ).build(story, onFirstPage=footer, onLaterPages=footer)
-    return buf.getvalue()
+    return _build(story, t, disclaimer, f"{t['title']} - {c['name']}")

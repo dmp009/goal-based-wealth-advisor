@@ -145,7 +145,9 @@ st.plotly_chart(goal_probability_change(r, client.goals), width="stretch")
 # --------------------------------------------------------------------------- trades
 st.header("Rebalancing trades")
 if not r.trades:
-    st.info("No rebalancing needed: all asset classes are within ±5 pp of target.")
+    st.info(
+        f"No rebalancing needed: all asset classes are within ±{r.drift_band * 100:g} pp of target."
+    )
 else:
     names = {e.ticker: e.name for e in get_etfs()}
     st.dataframe(

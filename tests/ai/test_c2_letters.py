@@ -1,5 +1,7 @@
 """Sample EN/FR letters built from c2's real facts must pass numeric verification."""
 
+import json
+
 import pytest
 
 from wealthadvisor.ai.documents import generate
@@ -68,12 +70,33 @@ def test_c2_letter_with_wrong_number_flagged(facts):
     assert any("65" in e for e in verify(bad, "en", facts))
 
 
-def test_pipeline_ai_generates_four_docs_per_client(facts, tmp_path):
+def review_letter(f, lang):
+    tot = f["performance"]["total"]
+    g = f["goals"][0]
+    if lang == "en":
+        return (
+            f"# Annual review\n\n{g['label']}: probability {g['probability_before_pct']} % at the "
+            f"proposal, {g['probability_now_pct']} % now. Portfolio return {tot['twr_pct']} %, "
+            f"gain €{tot['gain_eur']:,}, value €{tot['value_eur']:,}.\n\n{f['disclaimer']['en']}"
+        )
+    return (
+        f"# Revue annuelle\n\n{g['label_fr']} : probabilité de {fr_pct(g['probability_before_pct'])} "
+        f"à la proposition, {fr_pct(g['probability_now_pct'])} aujourd'hui. Rendement "
+        f"{fr_pct(tot['twr_pct'])}, gain {fr_eur(tot['gain_eur'])}, valeur "
+        f"{fr_eur(tot['value_eur'])}.\n\n{f['disclaimer']['fr']}"
+    )
+
+
+def test_pipeline_ai_generates_four_docs_per_client(tmp_path):
     class Echo:
+        """Builds each body from the facts actually present in the prompt."""
+
         def write_document(self, prompt):
-            lang = "French" if "Write in French" in prompt else "English"
-            body = letter_fr(facts) if lang == "French" else letter_en(facts)
-            return {"title": "T", "body": body}
+            lang = "fr" if "Write in French" in prompt else "en"
+            f = json.loads(prompt.rsplit("<facts>", 1)[1].rsplit("</facts>", 1)[0])
+            if "proposal_date" in f:
+                return {"title": "T", "body": review_letter(f, lang)}
+            return {"title": "T", "body": (letter_fr if lang == "fr" else letter_en)(f)}
 
     docs = run_ai(["c2"], refresh=False, llm=Echo(), cache_dir=tmp_path)
     assert len(docs) == 8  # 4 proposal + 4 review documents (c2 has an existing portfolio)
@@ -82,10 +105,9 @@ def test_pipeline_ai_generates_four_docs_per_client(facts, tmp_path):
         for t in ("proposal_advisor", "proposal_client", "review_advisor", "review_client")
         for lg in ("en", "fr")
     }
-    # the echo stub only knows the proposal facts: those verify, review ones are rejected
-    assert all(d.verified for d in docs if d.doc_type.startswith("proposal"))
+    assert all(d.verified for d in docs), [d.errors for d in docs if not d.verified]
     again = run_ai(["c2"], refresh=False, llm=None, cache_dir=tmp_path)
-    assert len(again) == 4
+    assert len(again) == 8
 
 
 def test_pipeline_main_without_key_exits_cleanly(monkeypatch, caplog):
