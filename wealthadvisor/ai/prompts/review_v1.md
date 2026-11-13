@@ -14,7 +14,7 @@ You are drafting a {{DOC_KIND}} about the periodic review of an existing client 
 # Structure (mandatory, checked automatically)
 - Give each goal its own section with a Markdown heading that quotes the goal label verbatim: the `label` field in English documents, the `label_fr` field in French documents. Every figure about a goal must stay inside that goal's section; never put figures of one goal under another goal's heading.
 - Always write the % sign or the € sign next to every percentage and amount; write durations with their unit (years/ans, months/mois).
-- Durations (years, months) must be exactly the ones in the facts (`horizon_years_count`, `horizon_months_count`) or written in the facts text; do not convert or invent horizons.
+- Durations (years, months) must be exactly the ones in the facts (`review_period_months_count` for the period since the proposal, `horizon_years_count`, `horizon_months_count`) or written in the facts text; do not convert or invent horizons.
 
 # Tone and format
 - Advisor summary: concise, technical, bullet points welcome.

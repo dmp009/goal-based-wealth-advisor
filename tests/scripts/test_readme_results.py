@@ -35,7 +35,7 @@ REVIEW = {
     "client": {"name": "Test Client"},
     "proposal_date": "2025-04-30",
     "as_of": "2026-10-31",
-    "months_since_proposal_count": 18,
+    "review_period_months_count": 18,
     "performance": {"total": {"twr_pct": 12.3, "gain_eur": 25300}},
     "trades": [{"amount_eur": 500}, {"amount_eur": 500}],
     "trade_totals": {"sells_eur": 500, "buys_eur": 500, "est_tax_eur": 0},

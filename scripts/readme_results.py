@@ -88,7 +88,7 @@ def render_reviews_table(review_list: list[dict]) -> str:
         )
         cells = [
             r["client"]["name"],
-            f"{r['proposal_date']} to {r['as_of']} ({r['months_since_proposal_count']} months)",
+            f"{r['proposal_date']} to {r['as_of']} ({r['review_period_months_count']} months)",
             _pct(total["twr_pct"]),
             _eur(total["gain_eur"]),
             trades,

@@ -299,3 +299,14 @@ def test_c3_review_respects_pea_cap(reviews):
     f = review_facts(reviews["c3"])
     assert f["performance"]["pea"]["contributed_eur"] <= cap
     assert any("PEA" in n and "ceiling" in n for n in f["notes"])
+
+
+def test_review_period_in_months_passes_the_numeric_check(reviews):
+    from wealthadvisor.ai.numbers import verify
+
+    f = review_facts(reviews["c2"])
+    assert f["review_period_months_count"] == 18
+    twr = f["performance"]["total"]["twr_pct"]
+    assert verify(f"Over the past 18 months, your portfolio returned {twr}%.", "en", f) == []
+    fr = f"Sur les 18 derniers mois, votre portefeuille a progressé de {twr:.1f} %."
+    assert verify(fr.replace(".", ",", 1), "fr", f) == []

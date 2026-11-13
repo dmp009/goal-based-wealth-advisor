@@ -594,7 +594,7 @@ def review_facts(r: Review) -> dict:
         "as_of_year": int(r.as_of.year),
         "proposal_date": r.proposal_date.isoformat(),
         "proposal_year": int(r.proposal_date.year),
-        "months_since_proposal_count": int(months),
+        "review_period_months_count": int(months),
         "client": {
             "client_id": r.client_id,
             "name": c.name if c else "",
