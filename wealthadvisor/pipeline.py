@@ -89,7 +89,13 @@ def ai(
         facts = proposal_facts(build_proposal(c, con))
         for doc_type in ("proposal_advisor", "proposal_client"):
             for lang in ("en", "fr"):
-                d = generate(doc_type, lang, facts, llm, refresh, cache_dir or DEFAULT_CACHE_DIR)
+                try:
+                    d = generate(
+                        doc_type, lang, facts, llm, refresh, cache_dir or DEFAULT_CACHE_DIR
+                    )
+                except RuntimeError as exc:
+                    logger.error("%s %s/%s failed: %s", c.client_id, doc_type, lang, exc)
+                    continue
                 if d is None:
                     continue
                 logger.info(

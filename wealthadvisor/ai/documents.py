@@ -39,7 +39,10 @@ class Document:
 
 def cache_key(facts: dict, doc_type: str, lang: str, prompt_version: str | None = None) -> str:
     version = prompt_version if prompt_version is not None else load_settings().prompt_version
-    raw = json.dumps(facts, sort_keys=True) + version + doc_type + lang
+    family = doc_type.split("_")[0]
+    tpl = PROMPT_DIR / f"{family}_{version}.md"
+    template = tpl.read_text(encoding="utf-8") if tpl.exists() else ""
+    raw = json.dumps(facts, sort_keys=True) + version + doc_type + lang + template
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 

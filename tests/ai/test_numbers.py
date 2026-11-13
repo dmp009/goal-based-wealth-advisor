@@ -101,7 +101,9 @@ def test_verify_flags_wrong_percent():
 
 
 def test_verify_percent_tolerance():
-    assert verify("about 72,6 %", "fr", FACTS) == []
+    assert verify("about 72,3 %", "fr", FACTS) == []
+    assert verify("about 72 %", "fr", FACTS) == []
+    assert verify("about 72,6 %", "fr", FACTS) != []
     assert verify("about 73.0 %", "en", FACTS) != []
 
 
