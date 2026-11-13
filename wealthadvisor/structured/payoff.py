@@ -8,6 +8,8 @@ Documented conventions:
   1 + coupon * years if level >= autocall_level (i.e. called at maturity), 1.0 if level >= barrier,
   else the final level (capital loss). ``called_year`` is 0 when never called, k otherwise.
 - CPN: 100 % of capital at maturity + participation * max(0, index return); called_year = years.
+- annualised_expected_return = (E[multiple])^(1/E[life]) - 1 (not E[multiple^(1/life)]);
+  life = called_year, or years when never called / at maturity.
 - Product choice: ``autocall_sx5e`` for profile >= 5, else ``cpn_sx5e``.
 - Sizing: max_share * investable (liquid assets - funded emergency fund); horizon used is the
   longest bucket horizon; wrapper ``av`` if any bucket uses AV, else ``cto``.

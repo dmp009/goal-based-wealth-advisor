@@ -76,9 +76,36 @@ def test_c3_included_capped():
     assert d.included and d.product_id == "autocall_sx5e"
     assert 0 < d.amount <= 0.15 * inv + 1e-6
     assert d.wrapper in ("av", "cto") and d.payoff is not None
-    assert d.payoff.annualised_expected_return == pytest.approx(
-        d.payoff.expected_multiple ** (1 / 8) - 1, abs=0.05
+    pr = d.payoff
+    life = np.where(pr.called_year > 0, pr.called_year, 8).mean()
+    assert pr.annualised_expected_return == pytest.approx(
+        pr.expected_multiple ** (1 / life) - 1, abs=1e-9
     )
+
+
+def test_annualised_return_hand_built_autocall():
+    flat = [0.9] * 7
+    levels = np.vstack(
+        [
+            path(1.05, *[0.9] * 7),  # called y1 -> 1.07
+            path(0.9, 0.9, 1.0, *[0.9] * 5),  # called y3 -> 1.21
+            path(*flat, 0.70),  # not called, above barrier -> 1.0
+            path(*flat, 0.50),  # not called, loss -> 0.5
+        ]
+    )
+    r = autocall_payoff(levels, 0.07, 0.6)
+    assert list(r.called_year) == [1, 3, 0, 0]
+    assert r.expected_multiple == pytest.approx(0.945, abs=1e-9)
+    mean_life = (1 + 3 + 8 + 8) / 4
+    assert r.annualised_expected_return == pytest.approx(0.945 ** (1 / mean_life) - 1, abs=1e-9)
+    assert r.prob_capital_loss == 0.25
+
+
+def test_annualised_return_hand_built_cpn():
+    levels = np.vstack([path(*[1.0] * 7, f) for f in (1.2, 1.0, 0.6, 1.6)])
+    r = cpn_payoff(levels, 0.5)
+    assert r.expected_multiple == pytest.approx(1.1, abs=1e-9)
+    assert r.annualised_expected_return == pytest.approx(1.1 ** (1 / 8) - 1, abs=1e-9)
 
 
 def test_real_snapshot_sigma():
