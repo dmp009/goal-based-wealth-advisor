@@ -4,13 +4,13 @@ Documented simplifications:
 - Emergency fund is funded from ``liquid_assets`` first and is NOT topped up monthly.
 - Debts are ignored: investable = liquid_assets - emergency fund funded.
 - All monthly saving goes to the buckets.
-- Initial funding: essential goals first, then by date; within a priority group proportional
-  to inflated targets, a bucket never receiving more than the present value of its target at its
-  safe rate. Surplus goes to the longest-horizon bucket (rule recorded).
+- Initial funding: essential goals first; within a priority group goals are funded sequentially
+  by date (nearest first), each up to the present value of its target at its safe rate (no
+  over-funding). Surplus goes to the longest-horizon bucket (rule recorded).
 - Monthly saving follows the same order, capped by the level annuity that closes each bucket's gap
   (target minus funding grown at the safe rate); leftover goes to the longest-horizon bucket.
-- The PEA cap is checked against initial funding only (not cumulative monthly contributions);
-  the Livret A room left after initial funding is used for monthly flows, not decremented per month.
+- Livret A / PEA caps are shared: monthly flows are capped at remaining room / months_left and the
+  room is decremented by flow * months_left, so cumulative contributions respect both caps.
 """
 
 from __future__ import annotations
@@ -68,77 +68,96 @@ def inflate_target(target_today: float, years: float, inflation: float) -> float
     return target_today * (1 + inflation) ** years
 
 
-def _waterfill(total: float, weights: list[float], caps: list[float]) -> list[float]:
-    """Proportional split of ``total`` by weights, no item above its cap."""
-    out = [0.0] * len(weights)
-    active = [i for i in range(len(weights)) if caps[i] > 0 and weights[i] > 0]
+def _sequential(total: float, caps: list[float]) -> list[float]:
+    """Fill items in the given order, each up to its cap, until ``total`` runs out."""
+    out = []
     left = total
-    while active and left > 1e-9:
-        wsum = sum(weights[i] for i in active)
-        capped = [i for i in active if left * weights[i] / wsum >= caps[i] - out[i]]
-        if not capped:
-            for i in active:
-                out[i] += left * weights[i] / wsum
-            return out
-        for i in capped:
-            left -= caps[i] - out[i]
-            out[i] = caps[i]
-            active.remove(i)
+    for c in caps:
+        v = max(0.0, min(left, c))
+        out.append(v)
+        left -= v
     return out
 
 
 def _split(
-    amount: float, h: float, risk: int, profiles: dict[int, ProfileRule], st: dict, rules: list[str]
+    amount: float,
+    h: float,
+    risk: int,
+    profiles: dict[int, ProfileRule],
+    st: dict,
+    rules: list[str],
+    months: float | None = None,
+    label: str = "",
 ) -> dict[str, float]:
-    """Wrapper split of ``amount``. ``st`` holds shared remaining 'livret' and 'pea' room."""
+    """Wrapper split of ``amount``. ``st`` holds the shared remaining 'livret' and 'pea' room.
+
+    With ``months`` set, ``amount`` is a monthly flow: the per-month cap of a capped wrapper is
+    the remaining room divided by ``months`` and the room is decremented by flow * months.
+    """
     if amount <= 1e-9:
         return {}
+    k = months or 1.0
     prof = profiles[risk]
     safe = amount * prof.min_safe_share
     risky = amount - safe
     equity = min(risky, prof.max_equity * amount)
     bonds = risky - equity
     out: dict[str, float] = {}
+    pre = f"{label}: " if label else ""
 
-    def add(k: str, v: float) -> None:
+    def add(w: str, v: float) -> None:
         if v > 1e-9:
-            out[k] = out.get(k, 0.0) + v
+            out[w] = out.get(w, 0.0) + v
 
     if safe > 0:
         if h < 3:
-            la = min(safe, st["livret"])
-            st["livret"] -= la
+            la = min(safe, st["livret"] / k)
+            st["livret"] -= la * k
             add("livret_a", la)
-            add("av", safe - la)
-            rules.append(
-                f"Safe sleeve with horizon < 3 y goes to Livret A within the remaining cap "
-                f"({la:,.0f} EUR); overflow {safe - la:,.0f} EUR to fonds en euros in AV."
-            )
+            if safe - la > 1e-9:
+                add("av", safe - la)
+                rules.append(
+                    f"{pre}Safe sleeve with horizon < 3 y goes to Livret A within the remaining cap "
+                    f"({la:,.0f} EUR); overflow {safe - la:,.0f} EUR to fonds en euros in AV."
+                )
+            else:
+                rules.append(
+                    f"{pre}Safe sleeve with horizon < 3 y goes to Livret A within the remaining cap."
+                )
         else:
             add("av", safe)
-            rules.append("Safe sleeve with horizon >= 3 y goes to fonds en euros inside AV.")
+            rules.append(f"{pre}Safe sleeve with horizon >= 3 y goes to fonds en euros inside AV.")
     if equity > 0:
         if h >= 5 and st["pea"] > 0:
-            pe = min(equity, st["pea"])
-            st["pea"] -= pe
+            pe = min(equity, st["pea"] / k)
+            st["pea"] -= pe * k
             add("pea", pe)
             rest_wrapper = "av" if h >= 3 else "cto"
             add(rest_wrapper, equity - pe)
-            rules.append(
-                f"Equity part with horizon >= 5 y goes to PEA while contributions stay below the "
-                f"cap ({pe:,.0f} EUR); overflow {equity - pe:,.0f} EUR to {rest_wrapper.upper()}."
-            )
+            if equity - pe > 1e-9:
+                rules.append(
+                    f"{pre}Equity part with horizon >= 5 y goes to PEA while cumulative contributions "
+                    f"stay below the cap ({pe:,.0f} EUR); overflow {equity - pe:,.0f} EUR to "
+                    f"{rest_wrapper.upper()}."
+                )
+            else:
+                rules.append(
+                    f"{pre}Equity part with horizon >= 5 y goes to PEA (contributions below the cap)."
+                )
         elif h >= 3:
             add("av", equity)
-            rules.append("Equity part goes to AV (horizon >= 3 y, PEA not applicable or full).")
+            rules.append(
+                f"{pre}Equity part goes to AV (horizon >= 3 y, PEA not applicable or full)."
+            )
         else:
             add("cto", equity)
-            rules.append("Equity part with horizon < 3 y goes to CTO.")
+            rules.append(f"{pre}Equity part with horizon < 3 y goes to CTO.")
     if bonds > 0:
         w = "av" if h >= 3 else "cto"
         add(w, bonds)
         rules.append(
-            f"Bond part of the risky sleeve goes to {w.upper()} (horizon {'>=' if h >= 3 else '<'} 3 y)."
+            f"{pre}Bond part of the risky sleeve goes to {w.upper()} "
+            f"(horizon {'>=' if h >= 3 else '<'} 3 y)."
         )
     return out
 
@@ -188,7 +207,7 @@ def plan_buckets(
             idx = [i for i in range(n) if goals[i].priority == prio]
             if not idx or left <= 1e-9:
                 continue
-            got = _waterfill(left, [tgt[i] for i in idx], [caps[i] for i in idx])
+            got = _sequential(left, [caps[i] for i in idx])
             for i, v in zip(idx, got):
                 alloc[i] = v
             left -= sum(got)
@@ -196,17 +215,21 @@ def plan_buckets(
 
     init, surplus = by_group(investable, pv)
     longest = max(range(n), key=lambda i: hs[i]) if n else None
-    if surplus > 1e-9 and longest is not None:
-        init[longest] += surplus
-        rules[longest].append(
-            f"Surplus of {surplus:,.0f} EUR beyond all targets' present values goes to the "
-            "longest-horizon bucket."
-        )
+    has_surplus = surplus > 1e-9 and longest is not None
     for i in range(n):
-        rules[i].append(
-            f"Initial funding {init[i]:,.0f} EUR: {goals[i].priority} goal, allocated by priority then "
-            "date, proportional to inflated targets, capped at the target's present value."
+        base = init[i] + (surplus if has_surplus and i == longest else 0.0)
+        txt = (
+            f"Initial funding {base:,.0f} EUR: {goals[i].priority} goal, funded sequentially by "
+            "date within its priority group, each up to the present value of its target at the "
+            "safe rate"
         )
+        if has_surplus and i == longest:
+            txt += f", plus the surplus of {surplus:,.0f} EUR left after all targets are covered."
+        else:
+            txt += "."
+        rules[i].append(txt)
+    if has_surplus:
+        init[longest] += surplus
 
     # Monthly saving: capped by the level annuity closing the gap at the safe rate.
     caps_m = []
@@ -226,14 +249,22 @@ def plan_buckets(
     st = {"livret": max(0.0, la_cap - funded), "pea": pea_cap}
     risks = [bucket_risk(profile, h) for h in hs]
     splits = [_split(init[i], hs[i], risks[i], profiles, st, rules[i]) for i in range(n)]
+    # Monthly flows share one state decremented across buckets: cumulative flows over each
+    # bucket's horizon cannot exceed the Livret A / PEA room left after initial funding.
     msplits = []
     for i in range(n):
-        mr: list[str] = []
-        msplits.append(_split(mon[i], hs[i], risks[i], profiles, dict(st), mr))
-        if mr:
-            rules[i].append(
-                "Monthly contribution follows the same wrapper rules (caps use room left after initial funding)."
+        msplits.append(
+            _split(
+                mon[i],
+                hs[i],
+                risks[i],
+                profiles,
+                st,
+                rules[i],
+                months=max(1.0, hs[i] * 12),
+                label="Monthly contribution",
             )
+        )
 
     buckets = [
         Bucket(

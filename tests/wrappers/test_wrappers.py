@@ -98,7 +98,8 @@ def test_no_overfunding_and_surplus_to_longest():
     plan = plan_buckets(c, 4, TODAY, RATES, SETTINGS)
     a = next(b for b in plan.buckets if b.goal_id == "a")
     bb = next(b for b in plan.buckets if b.goal_id == "b")
-    assert a.funding_now < a.target_nominal
+    assert a.funding_now == pytest.approx(a.target_nominal / (1 + 0.017) ** a.horizon_years)
+    assert any("surplus" in r for r in bb.rules) and not any("surplus" in r for r in a.rules)
     assert bb.funding_now > bb.target_nominal
     assert a.funding_now + bb.funding_now == pytest.approx(500000 - 6000)
 
@@ -124,3 +125,52 @@ def test_sample_clients_run():
             max(0, cl.liquid_assets - plan.emergency.funded)
         )
         assert sum(b.monthly_contribution for b in plan.buckets) == pytest.approx(cl.monthly_saving)
+
+
+def test_cumulative_caps_respected_for_samples():
+    for cl in list_sample_clients():
+        p = score_profile(cl, TODAY).profile
+        plan = plan_buckets(cl, p, TODAY, RATES, SETTINGS)
+        la = plan.emergency.funded
+        pea = 0.0
+        for b in plan.buckets:
+            m = max(1.0, b.horizon_years * 12)
+            la += b.wrapper_split.get("livret_a", 0) + m * b.monthly_split.get("livret_a", 0)
+            pea += b.wrapper_split.get("pea", 0) + m * b.monthly_split.get("pea", 0)
+            assert sum(b.monthly_split.values()) == pytest.approx(b.monthly_contribution)
+        assert la <= 22950 + 1e-6
+        assert pea <= 150000 + 1e-6
+
+
+def test_livret_room_shared_with_emergency_fund():
+    c = make_client(
+        120000,
+        0,
+        [("short", 100000, date(2028, 4, 30), "essential")],
+        expenses=4000,
+    )
+    plan = plan_buckets(c, 2, TODAY, RATES, SETTINGS)
+    b = plan.buckets[0]
+    assert plan.emergency.funded == 22950
+    assert b.wrapper_split.get("livret_a", 0) == pytest.approx(0)
+    assert b.wrapper_split.get("av", 0) > 0
+    assert (
+        sum(x.wrapper_split.get("livret_a", 0) for x in plan.buckets) + plan.emergency.funded
+        <= 22950 + 1e-6
+    )
+
+
+def test_sequential_funding_by_date():
+    c = make_client(
+        30000,
+        0,
+        [
+            ("late", 20000, date(2034, 10, 31), "essential"),
+            ("early", 20000, date(2030, 10, 31), "essential"),
+        ],
+    )
+    plan = plan_buckets(c, 4, TODAY, RATES, SETTINGS)
+    early = next(b for b in plan.buckets if b.goal_id == "early")
+    late = next(b for b in plan.buckets if b.goal_id == "late")
+    assert early.funding_now == pytest.approx(early.target_nominal / 1.025**early.horizon_years)
+    assert late.funding_now == pytest.approx(30000 - 6000 - early.funding_now)
