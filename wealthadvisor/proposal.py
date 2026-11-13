@@ -46,7 +46,7 @@ from wealthadvisor.config import (
     load_settings,
     load_structured,
 )
-from wealthadvisor.data.warehouse import monthly_returns, upsert
+from wealthadvisor.data.warehouse import connect, monthly_returns, upsert
 from wealthadvisor.goals.montecarlo import GoalResult, simulate_bucket
 from wealthadvisor.portfolio.optimise import OptResult, optimise
 from wealthadvisor.portfolio.riskmodel import covariance, expected_returns, portfolio_stats
@@ -113,6 +113,15 @@ def snapshot_today(con) -> date:
     return d if isinstance(d, date) else pd.Timestamp(d).date()
 
 
+def prices_until(con, as_of: date):
+    """In-memory copy of ``fact_prices`` (and ``dim_product``) limited to dates <= ``as_of``."""
+    out = connect(":memory:")
+    for table, where in (("fact_prices", "WHERE date <= ?"), ("dim_product", "")):
+        df = con.execute(f"SELECT * FROM {table} {where}", [as_of] if where else []).df()
+        upsert(out, table, df)
+    return out
+
+
 def _add(h: dict[str, dict[str, float]], wrapper: str, product: str, amount: float) -> None:
     if amount > _EPS:
         prods = h.setdefault(wrapper, {})
@@ -175,13 +184,24 @@ def build_proposal(
     con,
     method_override: dict[str, str] | None = None,
     views: dict | None = None,
+    as_of: date | None = None,
 ) -> Proposal:
+    """Build the proposal as of the snapshot's last price date.
+
+    ``as_of`` (optional) re-runs the engine at an earlier date: "today" becomes ``as_of`` and the
+    price history is limited to dates on or before it (used by the annual review for the goal
+    probabilities at the original proposal date). The default behaviour is unchanged.
+    """
     method_override = method_override or {}
     for gid, m in method_override.items():
         if m not in METHODS:
             raise ValueError(f"unknown method {m!r} for goal {gid!r}; expected one of {METHODS}")
 
-    today = snapshot_today(con)
+    if as_of is not None:
+        con = prices_until(con, as_of)
+        today = as_of
+    else:
+        today = snapshot_today(con)
     settings = load_settings()
     rates = load_rates()
     profiles = load_profiles()
