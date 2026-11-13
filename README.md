@@ -4,7 +4,7 @@
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
-**Live demo:** coming soon (Streamlit Community Cloud)
+**Live demo:** [goal-based-wealth-advisor.streamlit.app](https://goal-based-wealth-advisor.streamlit.app/) (Streamlit Community Cloud)
 
 A decision-support tool for a wealth advisor (*conseiller en gestion de patrimoine*) at a
 French retail or private bank. It turns a client's situation, goals and MiFID II-style
