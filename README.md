@@ -10,9 +10,9 @@ A decision-support tool for a wealth advisor (*conseiller en gestion de patrimoi
 French retail or private bank. It turns a client's situation, goals and MiFID II-style
 questionnaire into a documented, goal-based proposal across French wrappers (Livret A, PEA,
 assurance-vie, CTO), runs the annual review of an existing portfolio, and drafts the advisor
-summary and the client letter in English and French. A deterministic engine computes every
-number; an LLM writes the text, and a checker rejects any document that contains a number
-the engine did not produce.
+summary and the client letter in English and French (on demand, with an Anthropic API key).
+A deterministic engine computes every number; an LLM writes the text, and a checker rejects
+any document that contains a number the engine did not produce.
 
 ## The business problem
 
@@ -345,5 +345,5 @@ assurance-vie et compte-titres, compare trois méthodes d'allocation (Markowitz,
 Black-Litterman, HRP) et estime par simulation de Monte-Carlo la probabilité d'atteindre
 chaque objectif après impôt. Un produit structuré n'est proposé que s'il est adapté, sinon
 l'exclusion est motivée. La revue annuelle mesure la performance, la dérive et propose des
-arbitrages. Une IA rédige la synthèse et la lettre client en français et en anglais ; chaque
-chiffre est vérifié automatiquement. Projet pédagogique, sans valeur de conseil.
+arbitrages. Une IA rédige la synthèse et la lettre client en français et en anglais (à la
+demande, avec une clé API) ; chaque chiffre est vérifié automatiquement. Projet pédagogique, sans valeur de conseil.
