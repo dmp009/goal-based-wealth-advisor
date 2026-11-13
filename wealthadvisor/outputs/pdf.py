@@ -33,6 +33,15 @@ _WRAPPER = {
 _T = {
     "en": {
         "title": "Investment proposal",
+        "sep": ": ",
+        "emergency": "Emergency fund",
+        "em_line": "target {target}, funded {funded}, shortfall {shortfall}.",
+        "approp": "Appropriateness warnings",
+        "approp_none": "No appropriateness warning.",
+        "not_offered": "not offered",
+        "fam_etf_equity": "Equity ETFs",
+        "fam_etf_bond": "Bond ETFs",
+        "at_risk": "At risk (< 50 %)",
         "client": "Client",
         "date": "Data as of",
         "profile": "Risk profile",
@@ -94,6 +103,15 @@ _T = {
     },
     "fr": {
         "title": "Proposition d'investissement",
+        "sep": " : ",
+        "emergency": "Épargne de précaution",
+        "em_line": "cible {target}, constituée {funded}, manque {shortfall}.",
+        "approp": "Avertissements d'adéquation",
+        "approp_none": "Aucun avertissement d'adéquation.",
+        "not_offered": "non proposé",
+        "fam_etf_equity": "ETF actions",
+        "fam_etf_bond": "ETF obligataires",
+        "at_risk": "Objectif à risque (< 50 %)",
         "client": "Client",
         "date": "Données au",
         "profile": "Profil de risque",
@@ -149,7 +167,7 @@ _T = {
         "r_sell": "vente",
         "r_tax": "Imposable",
         "r_esttax": "Impôt est.",
-        "r_notrades": "Aucun rééquilibrage nécessaire : toutes les classes d'actifs sont à ±{band} pp de la cible.",
+        "r_notrades": "Aucun rééquilibrage nécessaire : toutes les classes d'actifs restent à ±{band} points de la cible.",
         "r_letter": "Lettre au client",
         "r_noletter": "Aucune lettre client vérifiée n'est disponible pour cette revue.",
     },
@@ -260,9 +278,9 @@ def review_pdf(review, facts: dict, documents: dict, lang: str) -> bytes:
     pf = facts["profile"]
     story: list = [
         _p(t["r_title"], styles["title"]),
-        _p(f"{t['client']}: {c['name']} ({c['client_id']})", styles["body"]),
-        _p(f"{t['date']}: {facts['as_of']}", styles["body"]),
-        _p(f"{t['r_proposal']}: {facts['proposal_date']}", styles["body"]),
+        _p(f"{t['client']}{t['sep']}{c['name']} ({c['client_id']})", styles["body"]),
+        _p(f"{t['date']}{t['sep']}{facts['as_of']}", styles["body"]),
+        _p(f"{t['r_proposal']}{t['sep']}{facts['proposal_date']}", styles["body"]),
     ]
 
     story.append(_p(t["r_perf"], styles["h2"]))
@@ -356,9 +374,12 @@ def proposal_pdf(proposal, facts: dict, documents: dict, lang: str) -> bytes:
     c = facts["client"]
     story: list = [
         _p(t["title"], styles["title"]),
-        _p(f"{t['client']}: {c['name']} ({c['client_id']})", styles["body"]),
-        _p(f"{t['date']}: {facts['as_of']}", styles["body"]),
-        _p(f"{t['profile']}: {facts['profile']['risk_profile_count']} {t['of7']}", styles["h2"]),
+        _p(f"{t['client']}{t['sep']}{c['name']} ({c['client_id']})", styles["body"]),
+        _p(f"{t['date']}{t['sep']}{facts['as_of']}", styles["body"]),
+        _p(
+            f"{t['profile']}{t['sep']}{facts['profile']['risk_profile_count']} {t['of7']}",
+            styles["h2"],
+        ),
         _p(t["rules"], styles["h3"]),
     ]
     if proposal is not None:
@@ -367,6 +388,34 @@ def proposal_pdf(proposal, facts: dict, documents: dict, lang: str) -> bytes:
         rules = facts["profile"]["rules_fired"]
     for r in rules or [t["none"]]:
         story.append(_p("- " + r, styles["body"]))
+
+    # emergency fund
+    em = facts["emergency"]
+    line = t["em_line"].format(
+        target=_eur(em["target_eur"], lang),
+        funded=_eur(em["funded_eur"], lang),
+        shortfall=_eur(em["shortfall_eur"], lang),
+    )
+    story.append(_p(f"{t['emergency']}{t['sep']}{line}", styles["body"]))
+
+    # appropriateness
+    story.append(_p(t["approp"], styles["h2"]))
+    lines = []
+    if proposal is not None:
+        for fam, su in proposal.suitability.items():
+            label = t.get(f"fam_{fam}", fam)
+            if not su.included:
+                why = " ".join(render(m, lang) for m in su.reason_msgs)
+                lines.append(f"{label} ({t['not_offered']}){t['sep']}{why}")
+            lines += [render(m, lang) for m in su.warning_msgs]
+    else:
+        for fam, su in facts.get("appropriateness", {}).items():
+            label = t.get(f"fam_{fam}", fam)
+            if not su["included"]:
+                lines.append(f"{label} ({t['not_offered']}){t['sep']}{' '.join(su['reasons'])}")
+            lines += list(su["warnings"])
+    for w in lines or [t["approp_none"]]:
+        story.append(_p(("- " + w) if lines else w, styles["body"]))
 
     # wrapper plan
     story.append(_p(t["wrappers"], styles["h2"]))
@@ -384,6 +433,8 @@ def proposal_pdf(proposal, facts: dict, documents: dict, lang: str) -> bytes:
     rows = [[t["goal"], t["target"], t["prob"], t["method"], t["ret"], t["vol"]]]
     for g in facts["goals"]:
         label = g["label_fr"] if lang == "fr" else g["label"]
+        if g.get("shortfall_flag"):
+            label = f"{label} - {t['at_risk']}"
         rows.append(
             [
                 Paragraph(escape(_clean(label)), styles["cell"]),
@@ -402,10 +453,12 @@ def proposal_pdf(proposal, facts: dict, documents: dict, lang: str) -> bytes:
     story.append(_p(t["structured"], styles["h2"]))
     if s["included"]:
         name = _structured_name(s["product_id"], lang) if sd is not None else s["product_name"]
-        story.append(_p(f"{t['included']}: {name} - {_eur(s['amount_eur'], lang)}", styles["body"]))
+        story.append(
+            _p(f"{t['included']}{t['sep']}{name} - {_eur(s['amount_eur'], lang)}", styles["body"])
+        )
         if "prob_capital_loss_pct" in s:
             story.append(
-                _p(f"{t['loss']}: {_pct(s['prob_capital_loss_pct'], lang)}", styles["body"])
+                _p(f"{t['loss']}{t['sep']}{_pct(s['prob_capital_loss_pct'], lang)}", styles["body"])
             )
         if sd is not None and sd.payoff is not None and sd.payoff.describe_msg is not None:
             story.append(_p(render(sd.payoff.describe_msg, lang), styles["small"]))

@@ -119,3 +119,34 @@ def test_french_review_pdf_has_no_english_asset_classes(review_built):
     for en in ("equity world", "safe", "equity europe"):
         assert en not in text, en
     assert "Actions monde" in text or "Actifs sécurisés" in text
+
+
+@pytest.mark.parametrize(
+    "lang,heading,warning,emergency",
+    [
+        ("en", "Appropriateness warnings", "no knowledge of equity ETFs", "Emergency fund"),
+        (
+            "fr",
+            "Avertissements d'adéquation",
+            "aucune connaissance des ETF actions",
+            "Épargne de précaution",
+        ),
+    ],
+)
+def test_proposal_pdf_shows_appropriateness_warnings_and_emergency_fund(
+    lang, heading, warning, emergency
+):
+    text = " ".join(_proposal_text("c4", lang).split())
+    assert heading in text
+    assert warning in text
+    assert emergency in text
+
+
+def test_proposal_pdf_flags_goals_at_risk():
+    client = next(c for c in list_sample_clients() if c.client_id == "c3")
+    p = build_proposal(client, load_snapshot())
+    facts = proposal_facts(p)
+    assert any(g["shortfall_flag"] for g in facts["goals"])
+    for lang, marker in (("en", "At risk (< 50 %)"), ("fr", "Objectif à risque (< 50 %)")):
+        text = " ".join(_text(proposal_pdf(p, facts, {}, lang)).split())
+        assert text.count(marker) == sum(g["shortfall_flag"] for g in facts["goals"])
