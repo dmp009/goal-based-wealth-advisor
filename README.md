@@ -239,7 +239,7 @@ proposal, review, PDF) works without a key.
 - **Documentation.** [Business requirements](docs/business_requirements.md) (stakeholders,
   user stories, KPI definitions), [data dictionary](docs/data_dictionary.md),
   [data model and lineage](docs/data_model.md), [methodology](docs/methodology.md).
-- **Tests and CI.** About 240 pytest tests (no network) cover each engine module, the
+- **Tests and CI.** About 270 pytest tests (no network) cover each engine module, the
   expected profile of every sample client, the numeric checker against adversarial texts,
   the PDF output and the app pages. GitHub Actions runs ruff and pytest on every push.
 

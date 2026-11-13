@@ -197,8 +197,9 @@ annualised expected return = E[multiple]^(1 / E[life]) − 1.
 profile ≥ 5, capital-protected note for profile 4; amount = 15 % of investable assets after the
 emergency fund, carved from the longest-horizon bucket's risky sleeve before the ETFs are
 optimised; held as a unit-linked product inside the assurance-vie if the client uses one,
-otherwise in the CTO. Simplification: that bucket's Monte Carlo still models its whole risky
-sleeve with the ETF weights.
+otherwise in the CTO. If that risky sleeve is smaller than the 1,000 € minimum ticket
+(`min_ticket_eur`), no structured product is proposed and the reason is given. Simplification:
+that bucket's Monte Carlo still models its whole risky sleeve with the ETF weights.
 
 ## 9. Annual review (`wealthadvisor/review/engine.py`)
 
@@ -207,7 +208,10 @@ sleeve with the ETF weights.
   month-end price on or before the proposal date. At each later month end, Livret A and fonds
   en euros accrue one month of interest at the current configured rates, then the monthly
   saving is invested in the original wrapper/product proportions (Livret A only while below
-  its ceiling, the rest to fonds en euros). Structured notes are held **at par** (no
+  its ceiling, the rest to fonds en euros; PEA only while total PEA contributions are below the
+  150,000 € ceiling, the rest buys the same ETF in the assurance-vie, which a review note
+  states). For the sample business owner (c3) the PEA reaches the ceiling: 150,000 €
+  contributed to the PEA, the overflow going to the assurance-vie. Structured notes are held **at par** (no
   mark-to-market) and take no new money. `avg_cost` is the weighted average cost.
 - **Performance**: monthly chain-linked time-weighted return per wrapper and in total;
   contributions arrive after the month's valuation, so they never count as return. Gain =
