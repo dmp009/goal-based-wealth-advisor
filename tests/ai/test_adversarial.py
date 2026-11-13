@@ -100,3 +100,78 @@ def test_pipeline_continues_on_runtime_error(tmp_path):
             raise RuntimeError("max_tokens")
 
     assert ai(["c2"], False, Boom(), tmp_path) == []
+
+
+# ---------------------------------------------------------------- round 2
+
+R2_FLAGGED = [
+    ("Pour le master de votre fille, la probabilité est d'environ 98 %.", "fr"),
+    ("## Objectif : master de votre fille\nProbabilité : 98,0 %", "fr"),
+    ("## Retirement top-up capital\n### Overview\n- probability 50.7 %", "en"),
+    ("Over 15y it grows.", "en"),
+    ("Over 15yr it grows.", "en"),
+    ("Over 15 yrs it grows.", "en"),
+    ("A 15-year horizon.", "en"),
+    ("Sur 15 ans.", "fr"),
+    ("Over 25yrs.", "en"),
+    ("The drawdown is +15.0 %.", "en"),
+    ("Le 80e centile et le 85th percentile.", "fr"),
+    ("Vous avez 14 ans d'horizon sur ce projet de 99 ans.", "fr"),
+]
+
+
+@pytest.mark.parametrize("text,lang", R2_FLAGGED)
+def test_round2_flagged(facts, text, lang):
+    assert verify(text, lang, facts) != []
+
+
+def test_french_labels_in_facts(facts):
+    assert all(g["label_fr"] for g in facts["goals"])
+    assert facts["goals"][0]["label_fr"] == "Master de votre fille"
+
+
+def test_french_scoping_positive(facts):
+    g0 = facts["goals"][0]
+    p = str(g0["probability_pct"]).replace(".", ",")
+    assert verify(f"## Master de votre fille\nProbabilité : {p} %", "fr", facts) == []
+    ret = facts["goals"][1]
+    assert ret["probability_pct"] != g0["probability_pct"]
+    q = str(ret["probability_pct"]).replace(".", ",")
+    assert verify(f"## Master de votre fille\nProbabilité : {q} %", "fr", facts) != []
+
+
+def test_nested_heading_scope_ends_at_same_level(facts):
+    ret = facts["goals"][1]
+    other = facts["goals"][0]
+    text = f"## {ret['label']}\n### Overview\n- p {ret['probability_pct']} %\n## Notes\n- p {other['probability_pct']} %"
+    assert verify(text, "en", facts) == []
+
+
+def test_duration_units(facts):
+    assert verify("## Master de votre fille\nSur 4 ans.", "fr", facts) == []
+    assert verify("## Master de votre fille\nSur 15 ans.", "fr", facts) != []
+    assert verify("Over 46 months, the studies goal.", "en", facts) == []
+
+
+def test_percentiles_and_plus(facts):
+    assert verify("Le 90e centile et le 90th percentile.", "fr", facts) == []
+    assert verify("A gain of +3.7 %.", "en", facts) == []
+
+
+def test_french_amounts_and_multipliers(facts):
+    n = facts["emergency"]["funded_eur"]
+    dot = f"{n:,}".replace(",", ".")
+    assert verify(f"Épargne de {dot} €.", "fr", facts) == []
+    assert verify("Soit 15 M€.", "fr", facts) != []
+    assert verify("Soit 15 Mds €.", "fr", facts) != []
+    assert verify("Soit 15 Mio €.", "fr", facts) != []
+
+
+def test_pipeline_continues_on_any_exception(tmp_path):
+    from wealthadvisor.pipeline import ai
+
+    class Boom:
+        def write_document(self, prompt):
+            raise ValueError("api error")
+
+    assert ai(["c2"], False, Boom(), tmp_path) == []

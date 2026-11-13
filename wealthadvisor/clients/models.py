@@ -17,6 +17,7 @@ Answers = dict[str, str]  # question id -> answer key (see config/questionnaire.
 class Goal(BaseModel):
     goal_id: str
     label: str
+    label_fr: str = ""
     target_today_eur: float
     date: date
     priority: Literal["essential", "aspirational"]

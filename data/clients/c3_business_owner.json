@@ -12,6 +12,7 @@
     {
       "goal_id": "retirement",
       "label": "Retirement capital",
+      "label_fr": "Capital retraite",
       "target_today_eur": 1200000,
       "date": "2046-12-31",
       "priority": "essential"
@@ -19,6 +20,7 @@
     {
       "goal_id": "education",
       "label": "Children's studies abroad",
+      "label_fr": "Études des enfants à l'étranger",
       "target_today_eur": 120000,
       "date": "2033-09-01",
       "priority": "essential"
@@ -26,6 +28,7 @@
     {
       "goal_id": "holiday_home",
       "label": "Holiday home",
+      "label_fr": "Résidence secondaire",
       "target_today_eur": 140000,
       "date": "2038-06-30",
       "priority": "aspirational"

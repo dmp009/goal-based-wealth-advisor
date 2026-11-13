@@ -12,6 +12,7 @@
     {
       "goal_id": "home_adaptation",
       "label": "Home adaptation works",
+      "label_fr": "Travaux d'adaptation du logement",
       "target_today_eur": 25000,
       "date": "2028-06-30",
       "priority": "essential"
@@ -19,6 +20,7 @@
     {
       "goal_id": "grandchildren",
       "label": "Gift to grandchildren",
+      "label_fr": "Don aux petits-enfants",
       "target_today_eur": 15000,
       "date": "2030-06-30",
       "priority": "aspirational"
@@ -26,6 +28,7 @@
     {
       "goal_id": "care_reserve",
       "label": "Long-term care reserve",
+      "label_fr": "Réserve pour dépendance",
       "target_today_eur": 60000,
       "date": "2033-12-31",
       "priority": "essential"

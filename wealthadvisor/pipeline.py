@@ -93,7 +93,7 @@ def ai(
                     d = generate(
                         doc_type, lang, facts, llm, refresh, cache_dir or DEFAULT_CACHE_DIR
                     )
-                except RuntimeError as exc:
+                except Exception as exc:  # noqa: BLE001 - provider errors must not stop the batch
                     logger.error("%s %s/%s failed: %s", c.client_id, doc_type, lang, exc)
                     continue
                 if d is None:

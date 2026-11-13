@@ -27,7 +27,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Literal
 
-Kind = Literal["percent", "eur", "year", "age", "plain"]
+Kind = Literal["percent", "eur", "year", "age", "duration", "plain"]
 
 TEXT_TOL = 0.05
 EUR_REL_TOL = 0.01
@@ -42,29 +42,35 @@ class NumberToken:
     span: tuple[int, int] = field(default=(0, 0), compare=False)
     decimals: int = field(default=0, compare=False)
     strict: bool = field(default=True, compare=False)
+    plus: bool = field(default=False, compare=False)
 
 
 _SP = "   "
 _BODY = (
     rf"(?:\d{{1,3}}(?:[{_SP}]\d{{3}})+(?:[.,]\d+)?"  # space-grouped (FR, also EN)
     r"|\d{1,3}(?:,\d{3})+(?:\.\d+)?"  # comma-grouped (EN)
+    r"|\d{1,3}(?:\.\d{3}){2,}"  # dot-grouped (FR), 2+ groups
     r"|\d+(?:[.,]\d+)?)"  # plain
 )
 _CUR = ("€", "eur", "euro", "euros")
 _PATTERN = re.compile(
     r"(?<![\w])"
     rf"(?P<pre>(?:€|EUR|eur)[{_SP}]?)?"
-    r"(?P<sign>[-−](?=\d))?"
+    r"(?P<sign>[-−+](?=\d))?"
     rf"(?P<body>{_BODY})"
-    rf"(?P<mult>[{_SP}]?(?:thousand|milliards?|millions?|mille|billion|mln|Md|bn|mn|M|m|k|K)"
+    rf"(?P<mult>[{_SP}]?(?:thousand|milliards?|millions?|mille|billion|mln|Mrds?|Mds?|Mio|bn|mn|M|m|k|K)"
     r"(?![A-Za-z]))?"
     rf"(?:(?P<post>[{_SP}]?(?:%|pour[{_SP}]?cent|per[{_SP}]?cent|percent|pct|pp|pts?|points?"
     r"|€|EUR|eur|euros?)(?![A-Za-z]))"
     rf"|(?P<age>[{_SP}-]?(?:years?[ -]old|ans)(?![A-Za-z]))"
-    rf"|(?P<unit>(?:[{_SP}]?yrs?|y|x|×|s)(?![A-Za-z])))?"
+    rf"|(?P<dur>[{_SP}-]?(?:years?|yrs?|y|ans?|mois|months?)(?![A-Za-z]))"
+    r"|(?P<unit>(?:x|×|s)(?![A-Za-z])))?"
     r"(?![\w])"
 )
-_ORDINAL = re.compile(r"(?<![\w])(?:[1-9]|10)(?:st|nd|rd|th|er|ère|ème|e)(?![A-Za-z])")
+_ORDINAL = re.compile(
+    r"(?<![\w])(?:(?:[1-9]|10)(?:st|nd|rd|th|er|ère|ème|e)(?![A-Za-z])"
+    r"|(?:10|50|90)(?:th|e|ème)(?=[ \u00a0]+(?:percentile|centile)))"
+)
 _MULT = {
     "k": 1e3,
     "thousand": 1e3,
@@ -75,6 +81,10 @@ _MULT = {
     "million": 1e6,
     "millions": 1e6,
     "md": 1e9,
+    "mds": 1e9,
+    "mrd": 1e9,
+    "mrds": 1e9,
+    "mio": 1e6,
     "bn": 1e9,
     "billion": 1e9,
     "milliard": 1e9,
@@ -98,6 +108,8 @@ def _parse(body: str, lang: str) -> tuple[float, int]:
         if re.fullmatch(r"\d{1,3}(,\d{3})+", s) and (lang == "en" or s.count(",") > 1):
             return float(s.replace(",", "")), 0
         return float(s.replace(",", ".")), len(s) - s.rfind(",") - 1
+    if re.fullmatch(r"\d{1,3}(\.\d{3}){2,}", s):
+        return float(s.replace(".", "")), 0
     if "." in s:
         return float(s), len(s) - s.rfind(".") - 1
     return float(s), 0
@@ -108,7 +120,7 @@ def _is_list_marker(text: str, m: re.Match) -> bool:
     prefix = text[line_start : m.start()]
     if prefix.strip(_LINE_PREFIX):
         return False
-    if any(m.group(g) for g in ("pre", "sign", "mult", "post", "age", "unit")):
+    if any(m.group(g) for g in ("pre", "sign", "mult", "post", "age", "dur", "unit")):
         return False
     rest = text[m.end() : m.end() + 2]
     return bool(re.fullmatch(r"\d+", m.group("body"))) and bool(re.match(r"[.)](\s|$)", rest))
@@ -126,6 +138,8 @@ def _scan(text: str, lang: str) -> tuple[list[NumberToken], list[tuple[int, int]
         mult_word = (m.group("mult") or "").strip().lower()
         post = (m.group("post") or "").strip().lower()
         has_cur = bool(m.group("pre")) or post in _CUR
+        if has_cur and re.fullmatch(r"\d{1,3}\.\d{3}", m.group("body")):
+            value, decimals = float(m.group("body").replace(".", "")), 0  # FR "12.600 €"
         factor = 1.0
         if mult_word and (mult_word not in _AMBIGUOUS_MULT or has_cur):
             factor = _MULT[mult_word]
@@ -136,8 +150,12 @@ def _scan(text: str, lang: str) -> tuple[list[NumberToken], list[tuple[int, int]
         elif post:
             kind = "percent"
         elif m.group("age"):
-            kind = "age"
-            strict = bool(re.search(r"year", m.group("age"))) or _age_context(text, m)
+            if re.search(r"year", m.group("age")) or _age_context(text, m):
+                kind = "age"
+            else:
+                kind = "duration"  # "sur 5 ans"
+        elif m.group("dur"):
+            kind = "duration"
         elif _AGE_CTX.search(text[max(0, m.start() - 20) : m.start()]) and not m.group("unit"):
             kind = "age"
         elif (
@@ -149,10 +167,11 @@ def _scan(text: str, lang: str) -> tuple[list[NumberToken], list[tuple[int, int]
             kind = "year"
         else:
             kind = "plain"
-        if m.group("sign"):
+        if m.group("sign") and m.group("sign") != "+":
             value = -value
+        plus = m.group("sign") == "+"
         raw_tokens.append(
-            [m, value * factor if kind == "eur" else value, kind, factor, decimals, strict]
+            [m, value * factor if kind == "eur" else value, kind, factor, decimals, strict, plus]
         )
 
     # ranges "3–5 %": the first bound inherits percent/eur from the second
@@ -161,14 +180,14 @@ def _scan(text: str, lang: str) -> tuple[list[NumberToken], list[tuple[int, int]
         m2, _, k2, f2 = raw_tokens[i + 1][:4]
         if (
             k1 == "plain"
-            and k2 in ("percent", "eur")
+            and k2 in ("percent", "eur", "duration")
             and _RANGE_BETWEEN.match(text[m1.end() : m2.start()])
         ):
             raw_tokens[i][1] = v1 * f2 if k2 == "eur" else v1
             raw_tokens[i][2] = k2
     tokens = [
-        NumberToken(v, k, text[m.start() : m.end()].strip(), m.span(), d, st)
-        for m, v, k, _, d, st in raw_tokens
+        NumberToken(v, k, text[m.start() : m.end()].strip(), m.span(), d, st, pl)
+        for m, v, k, _, d, st, pl in raw_tokens
     ]
     return tokens, ignored
 
@@ -176,6 +195,8 @@ def _scan(text: str, lang: str) -> tuple[list[NumberToken], list[tuple[int, int]
 def _age_context(text: str, m: re.Match) -> bool:
     before = text[max(0, m.start() - 20) : m.start()]
     after = text[m.end() : m.end() + 12]
+    if re.match(r"\s*(?:d['’]|de\b|du\b|des\b)", after):
+        return False  # "14 ans d'horizon"
     return bool(_AGE_CTX.search(before) or re.search(r"âge", after, re.IGNORECASE))
 
 
@@ -197,6 +218,8 @@ class _Allowed:
     text_pct: list[float] = field(default_factory=list)
     text_eur: list[float] = field(default_factory=list)
     text_years: set[int] = field(default_factory=set)
+    dur: list[float] = field(default_factory=list)
+    text_dur: list[float] = field(default_factory=list)
     words: set[str] = field(default_factory=set)
 
 
@@ -229,6 +252,8 @@ def _collect(objs: list) -> _Allowed:
                 a.pct.append(v)
             elif key and key.endswith("_eur"):
                 a.eur.append(v)
+            elif key and key.endswith(("_years_count", "_months_count")):
+                a.dur.append(v)
             elif key and key.endswith("_year"):
                 a.year.add(int(v))
             elif key == "age":
@@ -245,21 +270,25 @@ def _collect(objs: list) -> _Allowed:
                     a.text_pct.append(t.value)
                 elif t.kind == "eur":
                     a.text_eur.append(t.value)
+                elif t.kind == "duration":
+                    a.text_dur.append(t.value)
 
     for o in objs:
         walk(o, None)
     return a
 
 
-def _near(v: float, pool: list[float], tol: float) -> bool:
+def _near(v: float, pool: list[float], tol: float, plus: bool = False) -> bool:
+    if plus:  # explicit plus: must match a positive fact
+        return any(p > 0 and abs(v - p) <= tol + 1e-9 for p in pool)
     if v < 0:  # explicit minus: must match a negative fact
         return any(p < 0 and abs(v - p) <= tol + 1e-9 for p in pool)
     return any(abs(v - abs(p)) <= tol + 1e-9 for p in pool)
 
 
-def _near_eur(v: float, pool: list[float]) -> bool:
+def _near_eur(v: float, pool: list[float], plus: bool = False) -> bool:
     for p in pool:
-        if v < 0 and p >= 0:
+        if (v < 0 and p >= 0) or (plus and p <= 0):
             continue
         tol = 0.0 if p == 0 else max(EUR_MIN_TOL, EUR_REL_TOL * abs(p))
         if abs(abs(v) - abs(p)) <= tol + 1e-9:
@@ -271,16 +300,16 @@ def _matches(t: NumberToken, a: _Allowed) -> bool:
     v = t.value
     if t.kind == "percent":
         tol = 0.5 if t.decimals == 0 else 0.5 * 10 ** (-t.decimals)
-        return _near(v, a.pct, tol) or _near(v, a.text_pct, TEXT_TOL)
+        return _near(v, a.pct, tol, t.plus) or _near(v, a.text_pct, TEXT_TOL, t.plus)
     if t.kind == "eur":
-        return _near_eur(v, a.eur + a.text_eur)
+        return _near_eur(v, a.eur + a.text_eur, t.plus)
+    if t.kind == "duration":
+        return _near(v, a.dur, 1e-9) or _near(v, a.text_dur, TEXT_TOL)
     if t.kind == "year":
         return int(v) in a.year or int(v) in a.text_years
     if t.kind == "age":
-        if _near(v, a.age, 1e-9):
-            return True
-        return not t.strict and (_near(v, a.anynum, 1e-9) or _near(v, a.text, TEXT_TOL))
-    return _near(v, a.anynum, 1e-6) or _near(v, a.text, TEXT_TOL)
+        return _near(v, a.age, 1e-9)
+    return _near(v, a.anynum, 1e-6, t.plus) or _near(v, a.text, TEXT_TOL, t.plus)
 
 
 _PERCENTILE = re.compile(r"^[Pp](?:10|50|90)$")
@@ -318,8 +347,9 @@ def _goal_names(goals: list) -> list[list[re.Pattern]]:
     for g in goals:
         pats = []
         if isinstance(g, dict):
-            if g.get("label"):
-                pats.append(re.compile(re.escape(_apos(str(g["label"]))), re.IGNORECASE))
+            for key in ("label", "label_fr"):
+                if g.get(key):
+                    pats.append(re.compile(re.escape(_apos(str(g[key]))), re.IGNORECASE))
             if g.get("goal_id"):
                 pats.append(
                     re.compile(rf"(?<![\w]){re.escape(str(g['goal_id']))}(?![\w])", re.IGNORECASE)
@@ -355,21 +385,26 @@ def verify(
         return [i for i, pats in enumerate(names) if any(p.search(flat) for p in pats)]
 
     errors: list[str] = []
-    heading_goal: int | None = None
+    scope: tuple[int, int] | None = None  # (goal index, heading level)
     for line in text.splitlines():
         if not line.strip():
             continue
         hits = named(line)
-        if line.lstrip().startswith("#"):
-            heading_goal = hits[0] if len(hits) == 1 else None
-        goal = hits[0] if len(hits) == 1 else (heading_goal if not hits else None)
+        stripped = line.lstrip()
+        if stripped.startswith("#"):
+            level = len(stripped) - len(stripped.lstrip("#"))
+            if len(hits) == 1:
+                scope = (hits[0], level)
+            elif not (scope and not hits and level > scope[1]):
+                scope = None  # same/higher level heading, or several goals: scope ends
+        goal = hits[0] if len(hits) == 1 else (scope[0] if scope and not hits else None)
         allowed = scoped[goal] if goal is not None else global_allowed
         tokens, ignored = _scan(line, lang)
         for t in tokens:
             if not _matches(t, allowed):
-                scope = f" for goal '{goals[goal].get('label', goal)}'" if goal is not None else ""
+                where = f" for goal '{goals[goal].get('label', goal)}'" if goal is not None else ""
                 errors.append(
-                    f"'{t.raw}' ({t.kind} {t.value:g}) does not match any number in the facts{scope}"
+                    f"'{t.raw}' ({t.kind} {t.value:g}) does not match any number in the facts{where}"
                 )
         for w in _uncovered(line, tokens, ignored, global_allowed.words):
             errors.append(f"'{w}' contains an unverifiable number")

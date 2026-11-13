@@ -12,6 +12,7 @@
     {
       "goal_id": "retirement",
       "label": "Retirement top-up capital",
+      "label_fr": "Capital complémentaire retraite",
       "target_today_eur": 250000,
       "date": "2040-09-30",
       "priority": "essential"
@@ -19,6 +20,7 @@
     {
       "goal_id": "studies",
       "label": "Daughter's master's degree",
+      "label_fr": "Master de votre fille",
       "target_today_eur": 40000,
       "date": "2030-09-01",
       "priority": "essential"
@@ -26,6 +28,7 @@
     {
       "goal_id": "renovation",
       "label": "Country house renovation",
+      "label_fr": "Rénovation de la maison de campagne",
       "target_today_eur": 30000,
       "date": "2032-06-30",
       "priority": "aspirational"

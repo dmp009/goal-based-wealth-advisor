@@ -332,6 +332,7 @@ def _goal_facts(bp: BucketProposal, client: Client | None, names: dict[str, str]
     facts = {
         "goal_id": b.goal_id,
         "label": goal.label if goal else b.goal_id,
+        "label_fr": (goal.label_fr or goal.label) if goal else b.goal_id,
         "priority": goal.priority if goal else "",
         "target_nominal_eur": _eur(b.target_nominal),
         "horizon_years_count": round(float(b.horizon_years)),

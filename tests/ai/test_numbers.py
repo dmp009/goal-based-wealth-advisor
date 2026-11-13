@@ -28,7 +28,7 @@ def vk(text, lang="en"):
 def test_en_grouping_and_decimals():
     assert vk("1,234.5") == [(1234.5, "plain")]
     assert vk("1,234") == [(1234.0, "plain")]
-    assert vk("about 4.7 years") == [(4.7, "plain")]
+    assert vk("about 4.7 years") == [(4.7, "duration")]
 
 
 @pytest.mark.parametrize("sp", [" ", " ", " "])
@@ -62,7 +62,7 @@ def test_multipliers():
     assert vk("€38.5k") == [(38500.0, "eur")]
     assert vk("1.2 million") == [(1_200_000.0, "eur")]
     assert vk("1,2 M€", "fr") == [(1_200_000.0, "eur")]
-    assert vk("10 months") == [(10.0, "plain")]
+    assert vk("10 months") == [(10.0, "duration")]
 
 
 def test_years_and_ages():
@@ -70,12 +70,14 @@ def test_years_and_ages():
     assert vk("2026-10-31") == [(2026.0, "year"), (10.0, "plain"), (31.0, "plain")]
     assert vk("a 68-year-old client") == [(68.0, "age")]
     assert vk("a 68 years old client") == [(68.0, "age")]
-    assert vk("cliente de 68 ans", "fr") == [(68.0, "age")]
+    assert vk("Vous avez 68 ans.", "fr") == [(68.0, "age")]
+    assert vk("sur 68 ans", "fr") == [(68.0, "duration")]
+    assert vk("Vous avez 14 ans d'horizon", "fr") == [(14.0, "duration")]
     assert vk("3000") == [(3000.0, "plain")]
 
 
 def test_ranges_and_markers():
-    assert vk("3–5 years") == [(3.0, "plain"), (5.0, "plain")]
+    assert vk("3–5 years") == [(3.0, "duration"), (5.0, "duration")]
     assert vk("3-5") == [(3.0, "plain"), (5.0, "plain")]
     assert vk("3–5 %") == [(3.0, "percent"), (5.0, "percent")]
     assert vk("1. Intro\n2. Plan with 5 %\n  3) end") == [(5.0, "percent")]
@@ -87,7 +89,7 @@ def test_identifiers_ignored():
 
 def test_verify_matching_letter_passes():
     text = (
-        "Dear Claire, your 45 years, the house goal in 2031 has a 72.3 % chance "
+        "Dear Claire, aged 45, the house goal in 2031 has a 72.3 % chance "
         "(about 72 %), target 38 500 EUR (38.5k), drawdown -15.0 %, horizon 5 years "
         "or 4.7 years, 22,950 EUR a year, cap of 40 %.\n\n"
         "1. First point\nEducational project — not investment advice (2026)"

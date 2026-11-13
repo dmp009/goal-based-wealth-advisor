@@ -12,6 +12,10 @@ You are drafting a {{DOC_KIND}} about an investment proposal prepared by a Frenc
 - Mention every exclusion with its reason, and every appropriateness warning present in the facts (structured products, complex products). State plainly when a product is excluded.
 - Never describe the autocall as "capital protected" or guaranteed. Make no promise of returns; probabilities and projections are simulations that can be wrong.
 
+# Structure (mandatory, checked automatically)
+- Give each goal its own section with a Markdown heading that quotes the goal label verbatim: the `label` field in English documents, the `label_fr` field in French documents. Every figure about a goal must stay inside that goal's section; never put figures of one goal under another goal's heading.
+- Durations (years, months) must be exactly the ones in the facts (`horizon_years_count`, `horizon_months_count`) or written in the facts text; do not convert or invent horizons.
+
 # Tone and format
 - Advisor summary: concise, technical, bullet points and short tables welcome, assume a financial professional.
 - Client letter: warm, clear, plain language, no jargon, in letter form. In French, use the formal vouvoiement ("vous") throughout and natural French, not a translation.
