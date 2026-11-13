@@ -10,6 +10,21 @@ import duckdb
 import pandas as pd
 
 from wealthadvisor.config import load_etfs, load_rates
+from wealthadvisor.data.warehouse import TABLES
+
+STALE_RUN = 3  # this many identical consecutive month-end closes or more -> warning
+CHECKS = (
+    ("price_gap", "error", "more than one month between two consecutive prices of a ticker"),
+    ("non_positive_price", "error", "missing, zero or negative adjusted close"),
+    (
+        "stale_price",
+        "warning",
+        f"{STALE_RUN} or more consecutive identical month-end closes (stale or forward-filled)",
+    ),
+    ("etf_without_prices", "error", "ETF of the configured universe with no price rows"),
+    ("pea_holding_not_eligible", "error", "PEA holding whose product is not PEA-eligible"),
+    ("livret_a_over_cap", "error", "Livret A balance above the regulatory ceiling"),
+)
 
 
 @dataclass
@@ -39,6 +54,24 @@ def run_quality_checks(con: duckdb.DuckDBPyConnection) -> list[QualityIssue]:
                     "error",
                 )
             )
+
+    # stale prices: runs of identical consecutive month-end closes
+    for ticker, g in prices.groupby("ticker"):
+        px = g["adj_close"].reset_index(drop=True)
+        run_id = (px != px.shift()).cumsum()
+        for _, run in px.groupby(run_id):
+            if len(run) >= STALE_RUN and pd.notna(run.iloc[0]):
+                first = g["date"].iloc[run.index[0]]
+                last = g["date"].iloc[run.index[-1]]
+                issues.append(
+                    QualityIssue(
+                        "stale_price",
+                        ticker,
+                        f"{len(run)} identical month-end closes ({run.iloc[0]:g}) "
+                        f"from {pd.Timestamp(first).date()} to {pd.Timestamp(last).date()}",
+                        "warning",
+                    )
+                )
 
     for r in prices[prices["adj_close"].isna() | (prices["adj_close"] <= 0)].itertuples():
         issues.append(
@@ -96,8 +129,11 @@ def _known(con: duckdb.DuckDBPyConnection, ticker: str) -> bool:
 
 
 def write_quality_report(
-    issues: list[QualityIssue], path: Path | str = "data_quality_report.md"
+    issues: list[QualityIssue],
+    path: Path | str = "data_quality_report.md",
+    con: duckdb.DuckDBPyConnection | None = None,
 ) -> None:
+    """Markdown report: result, checks run and, given ``con``, row counts and proxy shares."""
     lines = ["# Data quality report", ""]
     if not issues:
         lines.append("No issues found.")
@@ -108,4 +144,34 @@ def write_quality_report(
         for i in sorted(issues, key=lambda x: (x.severity != "error", x.check)):
             detail = i.detail.replace("|", "\\|")
             lines.append(f"| {i.severity} | {i.check} | {i.ticker or '-'} | {detail} |")
+    lines += ["", "## Checks run", "", "| Check | Severity | What it detects |", "|---|---|---|"]
+    lines += [f"| `{c}` | {sev} | {what} |" for c, sev, what in CHECKS]
+    if con is not None:
+        lines += [
+            "",
+            "## Row counts",
+            "",
+            "Client tables can be empty: the app reads the sample clients from `data/clients/`.",
+            "",
+            "| Table | Rows |",
+            "|---|---|",
+        ]
+        for table in TABLES:
+            n = con.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
+            lines.append(f"| {table} | {n} |")
+        lines += [
+            "",
+            "## Proxy share per ticker",
+            "",
+            "Months back-filled from a proxy index or ETF before the ETF's own history starts.",
+            "",
+            "| Ticker | Months | Proxy months | Proxy share |",
+            "|---|---|---|---|",
+        ]
+        rows = con.execute(
+            "SELECT ticker, count(*), sum(CASE WHEN is_proxy THEN 1 ELSE 0 END) "
+            "FROM fact_prices GROUP BY ticker ORDER BY ticker"
+        ).fetchall()
+        for ticker, n, proxy in rows:
+            lines.append(f"| {ticker} | {n} | {int(proxy)} | {100 * proxy / n:.1f}% |")
     Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")

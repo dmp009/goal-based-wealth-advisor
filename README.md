@@ -232,9 +232,10 @@ proposal, review, PDF) works without a key.
   publication, so the file is marked `unverified: true` and lists the unconfirmed asset
   classes.
 - **Data quality.** Automated checks cover month gaps within each price history, non-positive
-  prices, ETFs without prices, PEA holdings that are not PEA-eligible and Livret A balances
-  above the ceiling. The latest run found no issues:
-  [data_quality_report.md](data_quality_report.md).
+  and stale prices, ETFs without prices, PEA holdings that are not PEA-eligible and Livret A
+  balances above the ceiling. The latest run found no error and two stale-price warnings
+  (four flat month-ends in 2017-2018 for two S&P 500 ETFs); the report also gives row counts
+  and the proxy share per ticker: [data_quality_report.md](data_quality_report.md).
 - **Documentation.** [Business requirements](docs/business_requirements.md) (stakeholders,
   user stories, KPI definitions), [data dictionary](docs/data_dictionary.md),
   [data model and lineage](docs/data_model.md), [methodology](docs/methodology.md).

@@ -157,3 +157,56 @@ def test_snapshot_round_trip(tmp_path):
         ("AAA", 100.0, True)
     ]
     assert con2.execute("SELECT payload_json FROM fact_proposals").fetchone()[0] == "{}"
+
+
+def test_quality_flags_stale_prices():
+    d = pd.Timestamp
+    con = _con_with_prices(
+        [
+            ("AAA", d("2020-01-31"), 10.0, False),
+            ("AAA", d("2020-02-29"), 10.0, False),
+            ("AAA", d("2020-03-31"), 10.0, False),  # third identical close in a row
+            ("AAA", d("2020-04-30"), 11.0, False),
+            ("BBB", d("2020-01-31"), 10.0, False),
+            ("BBB", d("2020-02-29"), 10.0, False),  # only two: fine
+            ("BBB", d("2020-03-31"), 12.0, False),
+        ]
+    )
+    stale = [i for i in run_quality_checks(con) if i.check == "stale_price"]
+    assert [(i.ticker, i.severity) for i in stale] == [("AAA", "warning")]
+    assert "3" in stale[0].detail and "2020-01-31" in stale[0].detail
+
+
+def test_report_lists_checks_row_counts_and_proxy_share(tmp_path):
+    d = pd.Timestamp
+    con = _con_with_prices(
+        [
+            ("AAA", d("2020-01-31"), 10.0, True),
+            ("AAA", d("2020-02-29"), 11.0, False),
+            ("AAA", d("2020-03-31"), 12.0, False),
+            ("AAA", d("2020-04-30"), 13.0, False),
+        ]
+    )
+    p = tmp_path / "r.md"
+    write_quality_report(run_quality_checks(con), p, con)
+    text = p.read_text()
+    for check in (
+        "price_gap",
+        "non_positive_price",
+        "stale_price",
+        "etf_without_prices",
+        "pea_holding_not_eligible",
+        "livret_a_over_cap",
+    ):
+        assert f"`{check}`" in text, check
+    assert "| fact_prices | 4 |" in text
+    assert "| AAA | 4 | 1 | 25.0% |" in text
+
+
+def test_pipeline_quality_regenerates_report_from_snapshot(tmp_path):
+    from wealthadvisor.pipeline import main
+
+    p = tmp_path / "r.md"
+    main(["quality", "--report", str(p)])
+    text = p.read_text()
+    assert text.startswith("# Data quality report") and "| fact_prices |" in text

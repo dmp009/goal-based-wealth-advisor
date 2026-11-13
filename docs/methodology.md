@@ -296,13 +296,18 @@ error (an invented or misplaced figure), not the need for that review.
 
 ## 11. Data quality (`wealthadvisor/data/quality.py`)
 
-Run at the end of every ingest; the result is written to `data_quality_report.md` (latest:
-no issues).
+Run at the end of every ingest, or on the committed snapshot with
+`python -m wealthadvisor.pipeline quality` (no network). The result is written to
+`data_quality_report.md`, which also lists the checks run, the row count of every table and
+the share of proxy back-filled months per ticker. Latest run: no error, two warnings
+(PE500.PA and SP5C.PA each show four identical month-end closes from December 2017 to
+March 2018 in the source data; they are kept and flagged).
 
 | Check | Severity |
 |---|---|
 | Gap of more than one month inside a ticker's own history | error |
 | Missing or non-positive adjusted close | error |
+| Three or more identical consecutive month-end closes (stale price) | warning |
 | ETF in `config/etfs.yaml` without any price | error |
 | PEA holding in a product whose `pea_eligible` is not TRUE (null counts as not eligible) | error |
 | Livret A balance above the ceiling | error |

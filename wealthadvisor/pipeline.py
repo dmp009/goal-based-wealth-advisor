@@ -65,9 +65,19 @@ def ingest(db_path: Path | str, snapshot_dir: Path | str, report_path: Path | st
             int(g["is_proxy"].sum()),
         )
     issues = run_quality_checks(con)
-    write_quality_report(issues, report_path)
+    write_quality_report(issues, report_path, con)
     export_snapshot(con, snapshot_dir)
     logger.info("Ingest done: %d quality issue(s)", len(issues))
+
+
+def quality(snapshot_dir: Path | str, report_path: Path | str) -> None:
+    """Re-run the data-quality checks on the committed snapshot and rewrite the report."""
+    from wealthadvisor.data.snapshot import load_snapshot
+
+    con = load_snapshot(snapshot_dir)
+    issues = run_quality_checks(con)
+    write_quality_report(issues, report_path, con)
+    logger.info("Quality report: %d issue(s)", len(issues))
 
 
 def ai(
@@ -132,6 +142,9 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--db", default=REPO_ROOT / "data" / "warehouse.duckdb")
     p.add_argument("--snapshot-dir", default=SNAPSHOT_DIR)
     p.add_argument("--report", default=REPO_ROOT / "data_quality_report.md")
+    q = sub.add_parser("quality", help="re-run the quality checks on the snapshot (no network)")
+    q.add_argument("--snapshot-dir", default=SNAPSHOT_DIR)
+    q.add_argument("--report", default=REPO_ROOT / "data_quality_report.md")
     a = sub.add_parser("ai", help="generate and verify the AI proposal documents")
     a.add_argument("--refresh", action="store_true", help="regenerate even when cached")
     a.add_argument("--clients", default=None, help="comma-separated client ids (default: all)")
@@ -139,6 +152,8 @@ def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     if args.command == "ingest":
         ingest(args.db, args.snapshot_dir, args.report)
+    elif args.command == "quality":
+        quality(args.snapshot_dir, args.report)
     elif args.command == "ai":
         if not os.environ.get("ANTHROPIC_API_KEY"):
             logger.warning("ANTHROPIC_API_KEY is not set; skipping AI document generation")

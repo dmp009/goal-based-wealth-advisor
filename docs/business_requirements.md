@@ -99,8 +99,10 @@ As a data owner, I want automated checks and documented sources, so that I know 
 to challenge.
 
 - Checks: no gap of more than one month within each price history, no non-positive price,
-  prices for every ETF in the configuration, PEA holdings only in PEA-eligible products,
-  Livret A balance within the ceiling. Results are written to `data_quality_report.md`.
+  no stale price (three or more identical month-end closes in a row, warning), prices for
+  every ETF in the configuration, PEA holdings only in PEA-eligible products, Livret A balance
+  within the ceiling. Results are written to `data_quality_report.md` with the checks run,
+  row counts per table and the proxy share per ticker.
 - Every ETF lists its sources and its unverified fields; unknown values are left empty, never
   guessed. The capital market assumptions carry their source and an `unverified` flag.
 - Raw price responses are saved with a timestamp; back-filled prices are flagged `is_proxy`.
