@@ -62,7 +62,9 @@ _T = {
         "structured": "Structured product",
         "excluded": "No structured product is proposed.",
         "included": "Product",
-        "loss": "Probability of capital loss",
+        "loss": "Simulated probability of capital loss (excluding issuer default)",
+        "target_nominal": "Target (nominal)",
+        "target_today": "Target (today's €)",
         "letter": "Client letter",
         "noletter": "No verified client letter is available for this proposal.",
         "page": "Page",
@@ -132,7 +134,9 @@ _T = {
         "structured": "Produit structuré",
         "excluded": "Aucun produit structuré n'est proposé.",
         "included": "Produit",
-        "loss": "Probabilité de perte en capital",
+        "loss": "Probabilité simulée de perte en capital (hors défaut de l'émetteur)",
+        "target_nominal": "Cible (nominale)",
+        "target_today": "Cible (€ d'aujourd'hui)",
         "letter": "Lettre au client",
         "noletter": "Aucune lettre client vérifiée n'est disponible pour cette proposition.",
         "page": "Page",
@@ -321,7 +325,7 @@ def review_pdf(review, facts: dict, documents: dict, lang: str) -> bytes:
     )
 
     story.append(_p(t["r_goals"], styles["h2"]))
-    rows = [[t["goal"], t["target"], t["r_pb"], t["r_pn"]]]
+    rows = [[t["goal"], t["target_today"], t["r_pb"], t["r_pn"]]]
     for g in facts["goals"]:
         label = g["label_fr"] if lang == "fr" else g["label"]
         rows.append(
@@ -430,7 +434,7 @@ def proposal_pdf(proposal, facts: dict, documents: dict, lang: str) -> bytes:
 
     # goals
     story.append(_p(t["goals"], styles["h2"]))
-    rows = [[t["goal"], t["target"], t["prob"], t["method"], t["ret"], t["vol"]]]
+    rows = [[t["goal"], t["target_nominal"], t["prob"], t["method"], t["ret"], t["vol"]]]
     for g in facts["goals"]:
         label = g["label_fr"] if lang == "fr" else g["label"]
         if g.get("shortfall_flag"):

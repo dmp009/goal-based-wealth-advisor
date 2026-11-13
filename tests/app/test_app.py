@@ -126,3 +126,14 @@ def test_unfunded_bucket_shows_message_instead_of_fan_chart():
         sum("Not funded: nothing left after higher-priority goals." in i.value for i in at.info)
         == 2
     )
+
+
+def test_app_probabilities_have_one_decimal_and_loss_label():
+    at = _review("c2")
+    goals = next(d.value for d in at.dataframe if "Probability now (%)" in d.value.columns)
+    vals = list(goals["Probability now (%)"]) + list(goals["Probability before (%)"])
+    assert any(v != round(v) for v in vals)  # not rounded to whole percents
+    assert all(round(v, 1) == v for v in vals)
+    at = _run("c3")
+    labels = [m.label for m in at.metric]
+    assert "Simulated probability of capital loss (excluding issuer default)" in labels

@@ -136,8 +136,8 @@ st.dataframe(
         [
             {
                 "Goal": labels.get(gb.goal_id, gb.goal_id),
-                "Probability before (%)": round(gb.probability * 100),
-                "Probability now (%)": round(gn.probability * 100),
+                "Probability before (%)": round(gb.probability * 100, 1),
+                "Probability now (%)": round(gn.probability * 100, 1),
                 "Median now (EUR)": round(gn.p50),
             }
             for gb, gn in zip(r.goals_before, r.goals_now, strict=True)

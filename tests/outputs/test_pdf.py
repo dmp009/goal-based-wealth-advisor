@@ -150,3 +150,34 @@ def test_proposal_pdf_flags_goals_at_risk():
     for lang, marker in (("en", "At risk (< 50 %)"), ("fr", "Objectif à risque (< 50 %)")):
         text = " ".join(_text(proposal_pdf(p, facts, {}, lang)).split())
         assert text.count(marker) == sum(g["shortfall_flag"] for g in facts["goals"])
+
+
+@pytest.mark.parametrize(
+    "lang,loss,target",
+    [
+        (
+            "en",
+            "Simulated probability of capital loss (excluding issuer default)",
+            "Target (nominal)",
+        ),
+        (
+            "fr",
+            "Probabilité simulée de perte en capital (hors défaut de l'émetteur)",
+            "Cible (nominale)",
+        ),
+    ],
+)
+def test_proposal_pdf_explicit_labels(lang, loss, target):
+    text = " ".join(_proposal_text("c3", lang).split())
+    assert loss in text
+    assert target in text
+
+
+@pytest.mark.parametrize(
+    "lang,target", [("en", "Target (today's €)"), ("fr", "Cible (€ d'aujourd'hui)")]
+)
+def test_review_pdf_target_label(review_built, lang, target):
+    from wealthadvisor.outputs.pdf import review_pdf
+
+    r, facts = review_built
+    assert target in " ".join(_text(review_pdf(r, facts, {}, lang)).split())

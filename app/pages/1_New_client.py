@@ -310,7 +310,10 @@ if s.included:
     )
     if s.payoff is not None:
         st.write(s.payoff.describe)
-        st.metric("Probability of capital loss", _pct(s.payoff.prob_capital_loss))
+        st.metric(
+            "Simulated probability of capital loss (excluding issuer default)",
+            _pct(s.payoff.prob_capital_loss),
+        )
         st.plotly_chart(payoff_histogram(s.payoff), width="stretch", key="payoff")
 else:
     st.info("No structured product is proposed.")
