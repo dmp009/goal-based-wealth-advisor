@@ -90,7 +90,7 @@ choice = st.selectbox(
 client: Client | None = None
 if choice == BLANK:
     as_of = date.fromisoformat(get_as_of())
-    add_second = st.checkbox("Add a second goal", key="blank_goal2")
+    add_second = st.checkbox("Add a second goal", value=True, key="blank_goal2")
     with st.form("blank_form"):
         st.subheader("Situation")
         c1, c2, c3 = st.columns(3)
@@ -100,21 +100,25 @@ if choice == BLANK:
         c1, c2, c3, c4 = st.columns(4)
         income = c1.number_input("Annual income (EUR)", 0, 5_000_000, 50_000, step=1000)
         expenses = c2.number_input("Monthly expenses (EUR)", 0, 100_000, 2_000, step=100)
-        liquid = c3.number_input("Liquid assets (EUR)", 0, 50_000_000, 30_000, step=1000)
-        saving = c4.number_input("Monthly saving (EUR)", 0, 100_000, 500, step=50)
+        liquid = c3.number_input(
+            "Liquid assets (EUR)", 0, 50_000_000, 80_000, step=1000, key="blank_liquid"
+        )
+        saving = c4.number_input(
+            "Monthly saving (EUR)", 0, 100_000, 1_000, step=50, key="blank_saving"
+        )
         st.subheader("Goals")
         goals_in = []
         for n in (1, 2):
             if n == 2 and not add_second:
                 break
             g1, g2, g3, g4 = st.columns([3, 2, 2, 2])
-            label = g1.text_input(f"Goal {n}", "Home purchase" if n == 1 else "Retirement top-up")
+            label = g1.text_input(f"Goal {n}", "Home deposit" if n == 1 else "Retirement")
             target = g2.number_input(
-                "Target (EUR, today's money)", 1000, 50_000_000, 60_000 if n == 1 else 150_000,
+                "Target (EUR, today's money)", 1000, 50_000_000, 40_000 if n == 1 else 250_000,
                 step=1000, key=f"blank_t{n}",
             )  # fmt: skip
             gdate = g3.date_input(
-                "Date", as_of + timedelta(days=365 * (5 if n == 1 else 15)), key=f"blank_d{n}"
+                "Date", as_of + timedelta(days=365 * (5 if n == 1 else 20)), key=f"blank_d{n}"
             )
             prio = g4.selectbox(
                 "Priority", ["essential", "aspirational"], index=n - 1, key=f"blank_p{n}"
@@ -249,7 +253,7 @@ for bp in p.buckets:
     st.subheader(f"{g.label if g else b.goal_id}  ({g.priority if g else ''})")
     cols = st.columns(5)
     cols[0].metric("Target (nominal)", _eur(b.target_nominal))
-    cols[1].metric("Probability of reaching it", f"{bp.goal.probability * 100:.0f}%")
+    cols[1].metric("Probability of reaching it", f"{bp.goal.probability * 100:.1f}%")
     cols[2].metric("Expected return (bucket)", _pct(bp.expected_return))
     cols[3].metric("Volatility (bucket)", _pct(bp.volatility))
     cols[4].metric("Median outcome (after tax)", _eur(bp.goal.p50))
@@ -281,7 +285,12 @@ for bp in p.buckets:
     t1, t2 = st.columns([3, 2])
     t1.dataframe(pd.DataFrame(cmp_rows), width="stretch", hide_index=True)
     t2.plotly_chart(method_comparison(bp), width="stretch", key=f"cmp_{b.goal_id}")
-    st.plotly_chart(fan_chart(bp.goal, b.target_nominal), width="stretch", key=f"fan_{b.goal_id}")
+    if b.funding_now <= 0 and b.monthly_contribution <= 0:
+        st.info("Not funded: nothing left after higher-priority goals.")
+    else:
+        st.plotly_chart(
+            fan_chart(bp.goal, b.target_nominal), width="stretch", key=f"fan_{b.goal_id}"
+        )
     held = {t for prods in bp.holdings_eur.values() for t in prods}
     unv = [
         f"{etf_by_ticker[t].name} ({', '.join(etf_by_ticker[t].unverified_fields)})"

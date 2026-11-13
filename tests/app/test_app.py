@@ -99,3 +99,30 @@ def test_review_editing_answer_flips_profile_changed():
     at.button(key="reprofile_submit").click().run()
     assert not at.exception, [e.value for e in at.exception]
     assert any("profile changed" in w.value.lower() for w in at.warning)
+
+
+def _blank(**inputs):
+    at = _run()
+    at.selectbox(key="client_select").select("Blank client").run()
+    for key, value in inputs.items():
+        at.number_input(key=key).set_value(value)
+    at.button(key="blank_submit").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    return at
+
+
+def test_blank_client_defaults_give_meaningful_probabilities():
+    at = _blank()
+    probs = [m.value for m in at.metric if m.label == "Probability of reaching it"]
+    assert len(probs) == 2, probs  # both default goals are on
+    for v in probs:
+        assert 0.3 < float(v.rstrip("%")) / 100 < 0.95, probs
+        assert "." in v  # one decimal
+
+
+def test_unfunded_bucket_shows_message_instead_of_fan_chart():
+    at = _blank(blank_liquid=5000, blank_saving=0)
+    assert (
+        sum("Not funded: nothing left after higher-priority goals." in i.value for i in at.info)
+        == 2
+    )
