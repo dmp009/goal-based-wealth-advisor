@@ -20,12 +20,19 @@ from wealthadvisor.clients.models import Client, list_sample_clients
 from wealthadvisor.config import load_etfs, load_settings
 from wealthadvisor.data.snapshot import load_snapshot
 from wealthadvisor.proposal import build_proposal, proposal_facts, snapshot_today
+from wealthadvisor.review.engine import build_review
 
 DOC_TABS = (
     ("Advisor EN", "proposal_advisor", "en"),
     ("Advisor FR", "proposal_advisor", "fr"),
     ("Client EN", "proposal_client", "en"),
     ("Client FR", "proposal_client", "fr"),
+)
+REVIEW_DOC_TABS = (
+    ("Advisor EN", "review_advisor", "en"),
+    ("Advisor FR", "review_advisor", "fr"),
+    ("Client EN", "review_client", "en"),
+    ("Client FR", "review_client", "fr"),
 )
 
 
@@ -69,6 +76,18 @@ def get_documents(facts_json: str) -> dict:
     """Cached AI documents keyed by (doc_type, lang); None when not generated yet."""
     facts = json.loads(facts_json)
     return {(dt, lang): generate(dt, lang, facts, None) for _, dt, lang in DOC_TABS}
+
+
+@st.cache_resource(show_spinner="Building annual review...", max_entries=32)
+def get_review(client_json: str, answers: tuple[tuple[str, str], ...]):
+    client = Client.model_validate(json.loads(client_json))
+    return build_review(client, get_con().cursor(), new_answers=dict(answers) or None)
+
+
+@st.cache_data(show_spinner=False, max_entries=64)
+def get_review_documents(facts_json: str) -> dict:
+    facts = json.loads(facts_json)
+    return {(dt, lang): generate(dt, lang, facts, None) for _, dt, lang in REVIEW_DOC_TABS}
 
 
 def facts_json(proposal) -> str:

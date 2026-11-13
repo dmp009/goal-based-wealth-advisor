@@ -100,3 +100,43 @@ def payoff_histogram(payoff) -> go.Figure:
         title="Structured product payoff distribution", showlegend=False, **_LAYOUT,
     )  # fmt: skip
     return fig
+
+
+def drift_bars(drift, band: float = 0.05) -> go.Figure:
+    """Target vs current weight per asset class (%), with the +/- band shaded around each target."""
+    classes = [str(c) for c in drift.index]
+    fig = go.Figure()
+    for i, c in enumerate(classes):
+        t = float(drift.loc[drift.index[i], "target"]) * 100
+        fig.add_shape(
+            type="rect", xref="x", yref="y", x0=i - 0.45, x1=i + 0.45,
+            y0=max(t - band * 100, 0), y1=t + band * 100,
+            fillcolor="rgba(154,165,177,0.25)", line={"width": 0}, layer="below",
+        )  # fmt: skip
+    fig.add_trace(go.Bar(x=classes, y=drift["target"] * 100, name="Target", marker_color=GREY))
+    fig.add_trace(go.Bar(x=classes, y=drift["current"] * 100, name="Current", marker_color=NAVY))
+    fig.update_layout(
+        barmode="group", yaxis_title="% of portfolio",
+        title=f"Target vs current weights (shaded: +/-{band * 100:.0f} pp band)", **_LAYOUT,
+    )  # fmt: skip
+    return fig
+
+
+def goal_probability_change(review, goals) -> go.Figure:
+    """Probability of reaching each goal: at the proposal date vs today (%)."""
+    label = {g.goal_id: g.label for g in goals}
+    names = [label.get(g.goal_id, g.goal_id) for g in review.goals_before]
+    fig = go.Figure()
+    fig.add_trace(
+        go.Bar(x=names, y=[g.probability * 100 for g in review.goals_before], name="Before",
+               marker_color=GREY)
+    )  # fmt: skip
+    fig.add_trace(
+        go.Bar(x=names, y=[g.probability * 100 for g in review.goals_now], name="Now",
+               marker_color=NAVY)
+    )  # fmt: skip
+    fig.update_layout(
+        barmode="group", yaxis_title="Probability (%)", yaxis_range=[0, 100],
+        title="Goal probability: proposal date vs today", **_LAYOUT,
+    )  # fmt: skip
+    return fig

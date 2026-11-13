@@ -33,10 +33,13 @@ with c1:
 with c2:
     st.subheader("2. Annual review")
     st.markdown(
+        "- Available for clients with an existing portfolio (the Moreau couple and Julien Deschamps)\n"
         "- Compare an existing proposal with the current market snapshot\n"
         "- Drift versus target weights and goal probability update\n"
-        "- Suggested rebalancing, explained in plain language"
+        "- Suggested rebalancing, explained in plain language\n"
+        "- Re-profile with edited answers, bilingual documents, PDF export"
     )
+    st.page_link("pages/2_Annual_review.py", label="Open Annual review")
 
 st.info(
     "Sample clients are fictional. All market data comes from a committed snapshot, so the app "

@@ -54,3 +54,39 @@ def test_pdf_omits_unverified_letter(built):
     bad = Document("proposal_client", "en", "T", "SECRETBODY", "k", False, ["x"])
     text = _text(proposal_pdf(p, facts, {"en": bad, "fr": None}, "en"))
     assert "SECRETBODY" not in text
+
+
+@pytest.fixture(scope="module")
+def review_built():
+    from wealthadvisor.review.engine import build_review, review_facts
+
+    client = next(c for c in list_sample_clients() if c.client_id == "c2")
+    r = build_review(client, load_snapshot())
+    return r, review_facts(r)
+
+
+@pytest.mark.parametrize("lang", ["en", "fr"])
+def test_review_pdf_disclaimer_and_content(review_built, lang):
+    from wealthadvisor.outputs.pdf import review_pdf
+
+    r, facts = review_built
+    pdf = review_pdf(r, facts, {"en": None, "fr": None}, lang)
+    assert pdf.startswith(b"%PDF")
+    text = _text(pdf).replace("\n", " ")
+    assert load_settings().disclaimer[lang] in text
+    assert r.client.name in text and "€" in text
+    if lang == "fr":
+        assert "Revue annuelle" in text
+
+
+def test_review_pdf_verified_letter_accents(review_built):
+    from wealthadvisor.outputs.pdf import review_pdf
+
+    r, facts = review_built
+    letter = Document(
+        "review_client", "fr", "Votre revue", "Chère cliente, à très bientôt.", "k", True, []
+    )
+    text = _text(review_pdf(r, facts, {"fr": letter}, "fr"))
+    assert "Chère cliente" in text
+    bad = Document("review_client", "en", "T", "SECRETBODY", "k", False, ["x"])
+    assert "SECRETBODY" not in _text(review_pdf(r, facts, {"en": bad}, "en"))

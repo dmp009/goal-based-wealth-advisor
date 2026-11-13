@@ -90,6 +90,7 @@ choice = st.selectbox(
 client: Client | None = None
 if choice == BLANK:
     as_of = date.fromisoformat(get_as_of())
+    add_second = st.checkbox("Add a second goal", key="blank_goal2")
     with st.form("blank_form"):
         st.subheader("Situation")
         c1, c2, c3 = st.columns(3)
@@ -104,7 +105,7 @@ if choice == BLANK:
         st.subheader("Goals")
         goals_in = []
         for n in (1, 2):
-            if n == 2 and not st.checkbox("Add a second goal", key="blank_goal2"):
+            if n == 2 and not add_second:
                 break
             g1, g2, g3, g4 = st.columns([3, 2, 2, 2])
             label = g1.text_input(f"Goal {n}", "Home purchase" if n == 1 else "Retirement top-up")

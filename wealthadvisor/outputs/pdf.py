@@ -55,6 +55,40 @@ _T = {
         "letter": "Client letter",
         "noletter": "No verified client letter is available for this proposal.",
         "page": "Page",
+        "r_title": "Annual review",
+        "r_proposal": "Proposal date",
+        "r_perf": "Performance",
+        "r_scope": "Scope",
+        "r_twr": "TWR",
+        "r_gain": "Gain",
+        "r_value": "Value",
+        "r_all": "Total",
+        "r_drift": "Drift versus target",
+        "r_class": "Asset class",
+        "r_cur": "Current",
+        "r_diff": "Difference",
+        "r_reb": "Rebalance",
+        "r_yes": "yes",
+        "r_no": "no",
+        "r_profile": "Risk profile",
+        "r_before": "at proposal",
+        "r_now": "now",
+        "r_changed": "The risk profile has changed.",
+        "r_same": "The risk profile is unchanged.",
+        "r_goals": "Goals: before and now",
+        "r_pb": "Prob. before",
+        "r_pn": "Prob. now",
+        "r_trades": "Rebalancing trades",
+        "r_wr": "Wrapper",
+        "r_prod": "Product",
+        "r_act": "Action",
+        "r_buy": "buy",
+        "r_sell": "sell",
+        "r_tax": "Taxable",
+        "r_esttax": "Est. tax",
+        "r_notrades": "No rebalancing needed: all asset classes are within the target band.",
+        "r_letter": "Client letter",
+        "r_noletter": "No verified client letter is available for this review.",
     },
     "fr": {
         "title": "Proposition d'investissement",
@@ -82,6 +116,40 @@ _T = {
         "letter": "Lettre au client",
         "noletter": "Aucune lettre client vérifiée n'est disponible pour cette proposition.",
         "page": "Page",
+        "r_title": "Revue annuelle",
+        "r_proposal": "Date de la proposition",
+        "r_perf": "Performance",
+        "r_scope": "Périmètre",
+        "r_twr": "TWR",
+        "r_gain": "Gain",
+        "r_value": "Valeur",
+        "r_all": "Total",
+        "r_drift": "Dérive par rapport à la cible",
+        "r_class": "Classe d'actifs",
+        "r_cur": "Actuel",
+        "r_diff": "Écart",
+        "r_reb": "Rééquilibrer",
+        "r_yes": "oui",
+        "r_no": "non",
+        "r_profile": "Profil de risque",
+        "r_before": "à la proposition",
+        "r_now": "aujourd'hui",
+        "r_changed": "Le profil de risque a changé.",
+        "r_same": "Le profil de risque est inchangé.",
+        "r_goals": "Objectifs : avant et maintenant",
+        "r_pb": "Prob. avant",
+        "r_pn": "Prob. maintenant",
+        "r_trades": "Arbitrages de rééquilibrage",
+        "r_wr": "Enveloppe",
+        "r_prod": "Produit",
+        "r_act": "Action",
+        "r_buy": "achat",
+        "r_sell": "vente",
+        "r_tax": "Imposable",
+        "r_esttax": "Impôt est.",
+        "r_notrades": "Aucun rééquilibrage nécessaire : toutes les classes d'actifs sont dans la bande cible.",
+        "r_letter": "Lettre au client",
+        "r_noletter": "Aucune lettre client vérifiée n'est disponible pour cette revue.",
     },
 }
 
@@ -138,6 +206,136 @@ def _table(rows, widths, align_right_from=1) -> Table:
         )
     )
     return t
+
+
+def _styles() -> dict:
+    base = getSampleStyleSheet()
+    return {
+        "title": ParagraphStyle("t", parent=base["Title"], textColor=NAVY, fontSize=20),
+        "h2": ParagraphStyle("h2", parent=base["Heading2"], textColor=NAVY, spaceBefore=10),
+        "h3": ParagraphStyle("h3", parent=base["Heading3"], textColor=NAVY),
+        "body": ParagraphStyle("b", parent=base["BodyText"], fontSize=9, leading=12),
+        "cell": ParagraphStyle("c", parent=base["BodyText"], fontSize=8.5, leading=10),
+        "small": ParagraphStyle("s", parent=base["BodyText"], fontSize=7.5, leading=9),
+    }
+
+
+def _build(story: list, t: dict, disclaimer: str, title: str) -> bytes:
+    def footer(canvas, doc):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 7)
+        canvas.setFillColor(colors.grey)
+        canvas.drawString(2 * cm, 1.2 * cm, _clean(disclaimer))
+        canvas.drawRightString(A4[0] - 2 * cm, 1.2 * cm, f"{t['page']} {doc.page}")
+        canvas.restoreState()
+
+    buf = BytesIO()
+    SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=2 * cm,
+        rightMargin=2 * cm,
+        topMargin=1.8 * cm,
+        bottomMargin=2 * cm,
+        title=title,
+    ).build(story, onFirstPage=footer, onLaterPages=footer)
+    return buf.getvalue()
+
+
+def review_pdf(review, facts: dict, documents: dict, lang: str) -> bytes:
+    """Annual review PDF: performance, drift, profile, goals before/now, trades, verified letter."""
+    if lang not in _T:
+        raise ValueError(f"unsupported language {lang!r}")
+    t = _T[lang]
+    disclaimer = load_settings().disclaimer[lang]
+    styles = _styles()
+    c = facts["client"]
+    pf = facts["profile"]
+    story: list = [
+        _p(t["r_title"], styles["title"]),
+        _p(f"{t['client']}: {c['name']} ({c['client_id']})", styles["body"]),
+        _p(f"{t['date']}: {facts['as_of']}", styles["body"]),
+        _p(f"{t['r_proposal']}: {facts['proposal_date']}", styles["body"]),
+    ]
+
+    story.append(_p(t["r_perf"], styles["h2"]))
+    rows = [[t["r_scope"], t["r_twr"], t["r_gain"], t["r_value"]]]
+    perf = facts["performance"]
+    for k in [k for k in perf if k != "total"] + ["total"]:
+        v = perf[k]
+        label = t["r_all"] if k == "total" else (_WRAPPER.get(k) or k)
+        if isinstance(label, dict):
+            label = label[lang]
+        rows.append(
+            [label, _pct(v["twr_pct"], lang), _eur(v["gain_eur"], lang), _eur(v["value_eur"], lang)]
+        )
+    story.append(_table(rows, [5 * cm, 3 * cm, 4 * cm, 4 * cm]))
+
+    story.append(_p(t["r_drift"], styles["h2"]))
+    rows = [[t["r_class"], t["target"], t["r_cur"], t["r_diff"], t["r_reb"]]]
+    for d in facts["drift"]:
+        rows.append(
+            [
+                d["asset_class"].replace("_", " "),
+                _pct(d["target_pct"], lang),
+                _pct(d["current_pct"], lang),
+                _pct(d["diff_pct"], lang),
+                t["r_yes"] if d["rebalance"] else t["r_no"],
+            ]
+        )
+    story.append(_table(rows, [5 * cm, 2.5 * cm, 2.5 * cm, 2.5 * cm, 2.5 * cm]))
+
+    story.append(_p(t["r_profile"], styles["h2"]))
+    story.append(
+        _p(
+            f"{pf['profile_before_count']} {t['of7']} ({t['r_before']}) -> "
+            f"{pf['profile_now_count']} {t['of7']} ({t['r_now']}). "
+            + (t["r_changed"] if pf["profile_changed"] else t["r_same"]),
+            styles["body"],
+        )
+    )
+
+    story.append(_p(t["r_goals"], styles["h2"]))
+    rows = [[t["goal"], t["target"], t["r_pb"], t["r_pn"]]]
+    for g in facts["goals"]:
+        label = g["label_fr"] if lang == "fr" else g["label"]
+        rows.append(
+            [
+                Paragraph(escape(_clean(label)), styles["cell"]),
+                _eur(g.get("target_today_eur", 0), lang),
+                _pct(g["probability_before_pct"], lang),
+                _pct(g["probability_now_pct"], lang),
+            ]
+        )
+    story.append(_table(rows, [6 * cm, 3.5 * cm, 3 * cm, 3 * cm]))
+
+    story.append(_p(t["r_trades"], styles["h2"]))
+    if facts["trades"]:
+        rows = [[t["r_wr"], t["r_prod"], t["r_act"], t["amount"], t["r_tax"], t["r_esttax"]]]
+        for tr in facts["trades"]:
+            w = _WRAPPER.get(tr["wrapper"], tr["wrapper"])
+            rows.append(
+                [
+                    w[lang] if isinstance(w, dict) else w,
+                    Paragraph(escape(_clean(tr["name"])), styles["cell"]),
+                    t["r_buy"] if tr["action"] == "buy" else t["r_sell"],
+                    _eur(tr["amount_eur"], lang),
+                    t["r_yes"] if tr["taxable"] else t["r_no"],
+                    _eur(tr["est_tax_eur"], lang),
+                ]
+            )
+        story.append(_table(rows, [2.6 * cm, 5.4 * cm, 1.8 * cm, 2.6 * cm, 1.8 * cm, 2.2 * cm]))
+    else:
+        story.append(_p(t["r_notrades"], styles["body"]))
+
+    story.append(_p(t["r_letter"], styles["h2"]))
+    letter = (documents or {}).get(lang)
+    if letter is not None and letter.verified:
+        story.extend(_letter_flowables(letter, styles))
+    else:
+        story.append(_p(t["r_noletter"], styles["body"]))
+    story += [Spacer(1, 12), _p(disclaimer, styles["small"])]
+    return _build(story, t, disclaimer, f"{t['r_title']} - {c['name']}")
 
 
 def proposal_pdf(proposal, facts: dict, documents: dict, lang: str) -> bytes:

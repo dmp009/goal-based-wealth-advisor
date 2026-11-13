@@ -76,14 +76,14 @@ def test_pipeline_ai_generates_four_docs_per_client(facts, tmp_path):
             return {"title": "T", "body": body}
 
     docs = run_ai(["c2"], refresh=False, llm=Echo(), cache_dir=tmp_path)
-    assert len(docs) == 4
+    assert len(docs) == 8  # 4 proposal + 4 review documents (c2 has an existing portfolio)
     assert {(d.doc_type, d.lang) for d in docs} == {
-        ("proposal_advisor", "en"),
-        ("proposal_advisor", "fr"),
-        ("proposal_client", "en"),
-        ("proposal_client", "fr"),
+        (t, lg)
+        for t in ("proposal_advisor", "proposal_client", "review_advisor", "review_client")
+        for lg in ("en", "fr")
     }
-    assert all(d.verified for d in docs)
+    # the echo stub only knows the proposal facts: those verify, review ones are rejected
+    assert all(d.verified for d in docs if d.doc_type.startswith("proposal"))
     again = run_ai(["c2"], refresh=False, llm=None, cache_dir=tmp_path)
     assert len(again) == 4
 

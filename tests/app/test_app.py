@@ -5,7 +5,7 @@ from streamlit.testing.v1 import AppTest
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = str(ROOT / "app" / "pages" / "1_New_client.py")
-HOME = str(ROOT / "app" / "streamlit_app.py")
+HOME = str(ROOT / "app" / "Home.py")
 CLIENTS = ["c1", "c2", "c3", "c4"]
 
 
@@ -52,3 +52,42 @@ def test_blank_client_form_submits():
     at.button(key="blank_submit").click().run()
     assert not at.exception, [e.value for e in at.exception]
     assert any("Risk profile" in m.label for m in at.metric)
+
+
+REVIEW = str(ROOT / "app" / "pages" / "2_Annual_review.py")
+
+
+def _review(client_id):
+    at = AppTest.from_file(REVIEW, default_timeout=180).run()
+    at.selectbox(key="review_client").select_index(CLIENTS.index(client_id)).run()
+    return at
+
+
+def test_review_c2_has_trades_table():
+    at = _review("c2")
+    assert not at.exception, [e.value for e in at.exception]
+    assert any("Action" in list(d.value.columns) for d in at.dataframe)
+    assert not any("No rebalancing needed" in i.value for i in at.info)
+    assert any("not investment advice" in c.value for c in at.caption)
+
+
+def test_review_c3_no_rebalancing():
+    at = _review("c3")
+    assert not at.exception, [e.value for e in at.exception]
+    assert any("No rebalancing needed" in i.value for i in at.info)
+
+
+@pytest.mark.parametrize("cid", ["c1", "c4"])
+def test_review_no_portfolio_message(cid):
+    at = _review(cid)
+    assert not at.exception, [e.value for e in at.exception]
+    assert any("No existing portfolio for this client" in i.value for i in at.info)
+
+
+def test_review_editing_answer_flips_profile_changed():
+    at = _review("c2")
+    assert not any("profile changed" in w.value.lower() for w in at.warning)
+    at.selectbox(key="rq_c2_loss_capacity").select("low")
+    at.button(key="reprofile_submit").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert any("profile changed" in w.value.lower() for w in at.warning)

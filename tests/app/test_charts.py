@@ -35,3 +35,14 @@ def test_payoff_histogram():
     r = PayoffResult(np.array([1.0, 1.2, 0.7, 1.4]), np.array([0, 2, 0, 3]), 0.25, 1.1, "d")
     fig = payoff_histogram(r)
     assert isinstance(fig, go.Figure) and len(fig.data) >= 1
+
+
+def test_review_charts():
+    from app.charts import drift_bars, goal_probability_change
+    from wealthadvisor.review.engine import build_review
+
+    con = load_snapshot()
+    client = next(c for c in list_sample_clients() if c.client_id == "c2")
+    r = build_review(client, con)
+    assert isinstance(drift_bars(r.drift, r.drift_band), go.Figure)
+    assert isinstance(goal_probability_change(r, client.goals), go.Figure)

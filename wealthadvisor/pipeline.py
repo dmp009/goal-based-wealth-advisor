@@ -76,36 +76,41 @@ def ai(
     llm=None,
     cache_dir: Path | str | None = None,
 ) -> list:
-    """Build proposals for the sample clients and generate the 4 proposal documents each."""
+    """Generate the 4 proposal documents per sample client, plus the 4 review documents for
+    clients with an existing portfolio."""
     from wealthadvisor.ai.documents import DEFAULT_CACHE_DIR, generate
     from wealthadvisor.clients.models import list_sample_clients
     from wealthadvisor.data.snapshot import load_snapshot
     from wealthadvisor.proposal import build_proposal, proposal_facts
+    from wealthadvisor.review.engine import build_review, review_facts
 
     clients = [c for c in list_sample_clients() if not client_ids or c.client_id in client_ids]
     con = load_snapshot()
     docs = []
     for c in clients:
-        facts = proposal_facts(build_proposal(c, con))
-        for doc_type in ("proposal_advisor", "proposal_client"):
-            for lang in ("en", "fr"):
-                try:
-                    d = generate(
-                        doc_type, lang, facts, llm, refresh, cache_dir or DEFAULT_CACHE_DIR
+        jobs = [(proposal_facts(build_proposal(c, con)), ("proposal_advisor", "proposal_client"))]
+        if c.original_proposal:
+            jobs.append((review_facts(build_review(c, con)), ("review_advisor", "review_client")))
+        for facts, doc_types in jobs:
+            for doc_type in doc_types:
+                for lang in ("en", "fr"):
+                    try:
+                        d = generate(
+                            doc_type, lang, facts, llm, refresh, cache_dir or DEFAULT_CACHE_DIR
+                        )
+                    except Exception as exc:  # noqa: BLE001 - provider errors must not stop the batch
+                        logger.error("%s %s/%s failed: %s", c.client_id, doc_type, lang, exc)
+                        continue
+                    if d is None:
+                        continue
+                    logger.info(
+                        "%s %s/%s: %s",
+                        c.client_id,
+                        doc_type,
+                        lang,
+                        "verified" if d.verified else "UNVERIFIED",
                     )
-                except Exception as exc:  # noqa: BLE001 - provider errors must not stop the batch
-                    logger.error("%s %s/%s failed: %s", c.client_id, doc_type, lang, exc)
-                    continue
-                if d is None:
-                    continue
-                logger.info(
-                    "%s %s/%s: %s",
-                    c.client_id,
-                    doc_type,
-                    lang,
-                    "verified" if d.verified else "UNVERIFIED",
-                )
-                docs.append(d)
+                    docs.append(d)
     return docs
 
 
