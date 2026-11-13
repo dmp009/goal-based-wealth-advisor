@@ -269,3 +269,13 @@ def test_prices_until_limits_history(snap):
     limited = prices_until(snap, date(2025, 4, 30))
     assert snapshot_today(limited) == date(2025, 4, 30)
     assert snapshot_today(snap) == date(2026, 10, 31)
+
+
+def test_c2_goal_comparison_is_consistent(reviews):
+    r = reviews["c2"]
+    assert r.performance["total"]["twr"] > 0
+    before = {g.goal_id: g.probability for g in r.goals_before}
+    now = {g.goal_id: g.probability for g in r.goals_now}
+    # renovation is fed only by monthly saving: it must get its share of today's value
+    assert now["renovation"] >= 0.3
+    assert now["studies"] >= before["studies"]

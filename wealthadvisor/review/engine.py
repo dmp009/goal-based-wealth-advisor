@@ -28,10 +28,18 @@ Documented conventions:
   Livret A are not traded. CTO sells are taxable: tax on the gain of the sold units at the
   weighted average cost; PEA / AV sells are not taxable events.
 - Goals: ``goals_before`` re-runs ``build_proposal`` at the proposal date (prices limited to that
-  date). ``goals_now`` re-simulates the same buckets (risk, safe share, chosen weights, safe rate,
-  monthly contribution, nominal target, wrapper split for tax) from the current value: the derived
-  portfolio minus the emergency fund (kept in Livret A) is split across buckets pro rata to the
-  initial funding of each bucket at the proposal; horizons are measured from ``as_of``.
+  date) with ``liquid_assets`` set to the amount actually invested in the original proposal, so
+  before and now describe the same money. ``goals_now`` re-simulates the same buckets (risk, safe
+  share, chosen weights, safe rate, monthly contribution, nominal target, wrapper split for tax)
+  from the current value: the derived portfolio minus the emergency fund (kept in Livret A) is
+  split across buckets pro rata to funding_now + n_months x monthly_contribution of each bucket
+  (n_months = month ends since the proposal), so buckets fed only by monthly saving get their
+  share. Horizons are measured from ``as_of``. The simulation uses the re-run engine's chosen ETF
+  weights, not the ETFs actually held (simplification).
+- A goal can stay at 0 % before and now when the plan leaves it unfunded (e.g. c3 holiday_home,
+  the deliberate underfunded example, ruling R12): the review reports it, it does not fix it.
+- Month grid: warehouse price dates that are calendar month ends, in (proposal_date, as_of].
+- Livret A / fonds en euros accrue at today's configured rates over the whole window.
 """
 
 from __future__ import annotations
@@ -69,6 +77,14 @@ _NOTES = (
     ),
     "Rebalancing stays inside each wrapper; future contributions move money between wrappers.",
     "Sales in the CTO are taxable; sales inside the PEA or the assurance-vie are not taxable events.",
+    (
+        "Livret A and fonds en euros interest uses the current configured rates over the whole "
+        "period since the proposal."
+    ),
+    (
+        "Goal probabilities now re-simulate the plan of the proposal date with today's values; a "
+        "goal left unfunded by that plan stays at 0 %."
+    ),
 )
 
 
@@ -164,7 +180,8 @@ def _track(client: Client, con, as_of: date) -> _Track:
     months = [
         pd.Timestamp(d)
         for (d,) in con.execute(
-            "SELECT DISTINCT date FROM fact_prices WHERE date > ? AND date <= ? ORDER BY date",
+            "SELECT DISTINCT date FROM fact_prices WHERE date > ? AND date <= ? "
+            "AND date = last_day(date) ORDER BY date",
             [start, as_of],
         ).fetchall()
     ]
@@ -424,7 +441,9 @@ def reprofile(
     return before, now, now.profile != before
 
 
-def _goals_now(client: Client, con, as_of: date, before, holdings, prices) -> list[GoalResult]:
+def _goals_now(
+    client: Client, con, as_of: date, before, holdings, prices, n_months: int
+) -> list[GoalResult]:
     settings = load_settings()
     etfs = load_etfs()
     tickers = [e.ticker for e in etfs]
@@ -435,9 +454,9 @@ def _goals_now(client: Client, con, as_of: date, before, holdings, prices) -> li
     total = sum(_value(h, prices) for h in holdings)
     livret = sum(_value(h, prices) for h in holdings if h.wrapper == "livret_a")
     investable = max(0.0, total - min(before.emergency.funded, livret))
-    funding = [bp.bucket.funding_now for bp in before.buckets]
-    if sum(funding) <= 0:  # no initial funding: split by monthly contribution instead
-        funding = [bp.bucket.monthly_contribution for bp in before.buckets]
+    funding = [
+        bp.bucket.funding_now + n_months * bp.bucket.monthly_contribution for bp in before.buckets
+    ]
     base = sum(funding)
     shares = [f / base for f in funding] if base > 0 else [1 / max(1, len(funding))] * len(funding)
     goal_dates = {g.goal_id: g.date for g in client.goals}
@@ -478,9 +497,12 @@ def build_review(
     start = proposal_date_of(client, as_of)
     track, perf, drift, trades, holdings = _analyse(client, con, as_of)
     before_p, now_p, changed = reprofile(client, start, as_of, new_answers)
-    before = build_proposal(client, con, as_of=start)
+    invested = sum(
+        float(v) for prods in client.original_proposal.values() for v in (prods or {}).values()
+    )
+    before = build_proposal(client.model_copy(update={"liquid_assets": invested}), con, as_of=start)
     goals_before = [bp.goal for bp in before.buckets]
-    goals_now = _goals_now(client, con, as_of, before, holdings, track.prices)
+    goals_now = _goals_now(client, con, as_of, before, holdings, track.prices, len(track.post) - 1)
     return Review(
         client_id=client.client_id,
         as_of=as_of,
