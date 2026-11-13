@@ -66,7 +66,8 @@ def test_goal_id_word_in_body_does_not_rescope(facts):
 
 
 def test_hundred_and_milliers_and_bp(facts):
-    assert verify("15 hundred euros a month", "en", facts) != []
+    assert verify("17 hundred euros a month", "en", facts) != []
+    assert verify("15 hundred euros a month", "en", facts) == []  # c2 saves 1,500 EUR a month
     assert verify("5 milliers d'euros", "fr", facts) != []
     assert verify("3 centaines d'euros", "fr", facts) != []
     assert verify("50 bp", "en", facts) != []

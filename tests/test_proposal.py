@@ -309,3 +309,10 @@ def test_structured_not_included_when_sleeve_below_minimum_ticket(con):
     assert not any("Structured product" in r for bp in p.buckets for r in bp.bucket.rules)
     f = proposal_facts(p)["structured"]
     assert f["included"] is False and "product_name" not in f
+
+
+def test_facts_include_client_saving_and_liquid_assets(proposals):
+    c = CLIENTS["c2"]
+    f = proposal_facts(proposals["c2"])["client"]
+    assert f["monthly_saving_eur"] == round(c.monthly_saving)
+    assert f["liquid_assets_eur"] == round(c.liquid_assets)

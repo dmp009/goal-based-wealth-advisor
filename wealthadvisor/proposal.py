@@ -464,6 +464,8 @@ def proposal_facts(p: Proposal) -> dict:
             "name": c.name if c else "",
             "age": int(c.age) if c else 0,
             "household": c.household if c else "",
+            "monthly_saving_eur": _eur(c.monthly_saving) if c else 0,
+            "liquid_assets_eur": _eur(c.liquid_assets) if c else 0,
         },
         "profile": {
             "risk_profile_count": int(p.profile.profile),
