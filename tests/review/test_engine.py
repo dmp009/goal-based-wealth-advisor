@@ -96,6 +96,19 @@ def test_structured_held_at_par():
     assert h[("av", "CW8.PA")].units == pytest.approx(60 + 500 / 150 * 2)
 
 
+def test_pea_contributions_stop_at_the_cap_and_overflow_to_av():
+    cap = load_rates()["pea_contribution_cap"]["value"]
+    con = _db({"CW8.PA": [100] * 6})
+    c = _client({"pea": {"CW8.PA": cap - 1500}}, saving=1000)
+    track_h = derive_holdings(c, con, as_of=date(2025, 3, 31))  # two month ends: 2 x 1000
+    h = _by_product(track_h)
+    assert h[("pea", "CW8.PA")].units * 100 == pytest.approx(cap)
+    assert h[("av", "CW8.PA")].units * 100 == pytest.approx(500)
+    perf, *_ = portfolio_review(c, con, as_of=date(2025, 3, 31))
+    assert perf["pea"]["contributed_eur"] == pytest.approx(cap)
+    assert perf["av"]["contributed_eur"] == pytest.approx(500)
+
+
 # ------------------------------------------------------------------ performance
 
 
@@ -279,3 +292,10 @@ def test_c2_goal_comparison_is_consistent(reviews):
     # renovation is fed only by monthly saving: it must get its share of today's value
     assert now["renovation"] >= 0.3
     assert now["studies"] >= before["studies"]
+
+
+def test_c3_review_respects_pea_cap(reviews):
+    cap = load_rates()["pea_contribution_cap"]["value"]
+    f = review_facts(reviews["c3"])
+    assert f["performance"]["pea"]["contributed_eur"] <= cap
+    assert any("PEA" in n and "ceiling" in n for n in f["notes"])

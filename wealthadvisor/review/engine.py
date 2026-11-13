@@ -10,7 +10,9 @@ Documented conventions:
   end after it (price dates in the warehouse, up to ``as_of``) Livret A and fonds en euros accrue
   one month of interest at their configured rates, then ``monthly_saving`` is invested in the same
   wrapper/product proportions as the original proposal. Livret A only takes deposits while its
-  balance is below the ceiling; the rest of its share goes to fonds en euros in the AV.
+  balance is below the ceiling; the rest of its share goes to fonds en euros in the AV. The PEA
+  only takes deposits while total PEA contributions are below the regulatory ceiling
+  (``pea_contribution_cap``); the rest of a PEA product's share buys the same ETF in the AV.
 - Structured products are held at par (no mark-to-market) and take no monthly contributions
   (their share of the saving is spread pro rata over the other products).
 - ``avg_cost`` is the weighted average cost (PRU). For Livret A / fonds en euros a "unit" is one
@@ -87,6 +89,11 @@ _NOTES = (
     ),
 )
 
+_PEA_CAP_NOTE = (
+    "PEA contributions reached the regulatory ceiling; the rest of the PEA share of the monthly "
+    "saving bought the same ETFs in the assurance-vie."
+)
+
 
 @dataclass
 class Trade:
@@ -114,6 +121,7 @@ class Review:
     holdings: list[Holding] = field(default_factory=list)
     client: Client | None = None
     drift_band: float = 0.05
+    pea_capped: bool = False
 
 
 # --------------------------------------------------------------------------- holdings
@@ -127,6 +135,7 @@ class _Track:
     contributed: dict[str, float]
     pre: list[dict[str, float]]  # month m: wrapper values before the month-end contribution
     post: list[dict[str, float]]  # month m: wrapper values after it (index 0 = proposal date)
+    pea_capped: bool = False  # monthly PEA deposits hit the contribution ceiling
 
 
 def proposal_date_of(client: Client, as_of: date) -> date:
@@ -162,6 +171,8 @@ def _track(client: Client, con, as_of: date) -> _Track:
     la_m = (1 + rates["livret_a_rate"]["value"]) ** (1 / 12)
     fe_m = (1 + rates["fonds_euros"]["value"]) ** (1 / 12)
     la_cap = rates["livret_a_cap"]["value"]
+    pea_cap = rates["pea_contribution_cap"]["value"]
+    pea_capped = False
 
     lines = [
         (w, p, float(v))
@@ -238,6 +249,19 @@ def _track(client: Client, con, as_of: date) -> _Track:
                     contributed["av"] = contributed.get("av", 0.0) + overflow
                 if amount <= 0:
                     continue
+            elif w == "pea":
+                room = max(0.0, pea_cap - contributed.get("pea", 0.0))
+                deposit = min(amount, room)
+                overflow = amount - deposit
+                amount = deposit
+                if overflow > 0:
+                    pea_capped = True
+                    av = pos.setdefault(("av", p), [0.0, 0.0])
+                    av[0] += overflow / price(p, ts)
+                    av[1] += overflow
+                    contributed["av"] = contributed.get("av", 0.0) + overflow
+                if amount <= 0:
+                    continue
             cur = pos.setdefault((w, p), [0.0, 0.0])
             cur[0] += amount / price(p, ts)
             cur[1] += amount
@@ -249,7 +273,7 @@ def _track(client: Client, con, as_of: date) -> _Track:
         if tickers
         else pd.Series(dtype=float)
     )
-    return _Track(start, pos, last, contributed, pre, post)
+    return _Track(start, pos, last, contributed, pre, post, pea_capped)
 
 
 def _holdings(track: _Track) -> list[Holding]:
@@ -518,6 +542,7 @@ def build_review(
         holdings=holdings,
         client=client,
         drift_band=load_settings().drift_band,
+        pea_capped=track.pea_capped,
     )
 
 
@@ -609,5 +634,5 @@ def review_facts(r: Review) -> dict:
             "est_tax_eur": _eur(sum(t.est_tax_eur for t in r.trades)),
         },
         "goals": goal_facts,
-        "notes": list(_NOTES),
+        "notes": list(_NOTES) + ([_PEA_CAP_NOTE] if r.pea_capped else []),
     }
