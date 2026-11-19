@@ -10,7 +10,7 @@ import streamlit as st
 from app.common import footer, get_as_of, setup
 
 setup("Home")
-st.title("Goal-based wealth advisor")
+st.title("Goal-based wealth advisor", icon=":material/account_balance:")
 st.markdown(
     "A decision-support tool for a French bank wealth advisor. It turns a client's situation, "
     "goals and MiFID-style questionnaire into a documented investment proposal across French "
@@ -18,9 +18,9 @@ st.markdown(
     "engine and every AI-written document checked against those numbers."
 )
 
-c1, c2 = st.columns(2)
+c1, c2 = st.columns(2, border=True)
 with c1:
-    st.subheader("1. New client")
+    st.subheader("New client")
     st.markdown(
         "- Capture the situation and the questionnaire answers\n"
         "- Deterministic risk profile and the rules that fired\n"
@@ -29,9 +29,9 @@ with c1:
         "- Structured product decision with its payoff distribution\n"
         "- Bilingual (EN/FR) advisor summary and client letter, PDF export"
     )
-    st.page_link("pages/1_New_client.py", label="Open New client")
+    st.page_link("pages/1_New_client.py", label="Open New client", icon=":material/person_add:")
 with c2:
-    st.subheader("2. Annual review")
+    st.subheader("Annual review")
     st.markdown(
         "- Available for clients with an existing portfolio (the Moreau couple and Julien Deschamps)\n"
         "- Compare an existing proposal with the current market snapshot\n"
@@ -39,9 +39,9 @@ with c2:
         "- Suggested rebalancing, explained in plain language\n"
         "- Re-profile with edited answers, bilingual documents, PDF export"
     )
-    st.page_link("pages/2_Annual_review.py", label="Open Annual review")
+    st.page_link("pages/2_Annual_review.py", label="Open Annual review", icon=":material/update:")
 
-st.info(
+st.caption(
     "Sample clients are fictional. All market data comes from a committed snapshot, so the app "
     "is reproducible and needs no live connection."
 )

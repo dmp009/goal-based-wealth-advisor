@@ -6,13 +6,29 @@ import plotly.graph_objects as go
 
 from wealthadvisor.config import load_etfs
 
-NAVY = "#1f3a5f"
-BLUE = "#4a78b0"
-ACCENT = "#c0392b"
-GREY = "#9aa5b1"
+# Sober portfolio palette, shared with .streamlit/config.toml (validated with the dataviz palette checker).
+BLUE = "#2558A8"  # main series (deep blue)
+ORANGE = "#B7791F"  # muted gold: second series, reference lines
+RED = "#C2362B"  # status: below / price
+GREY = "#9AA5B4"  # "before" / neutral comparison
+INK = "#0B0D10"
+GRID = "#E5E7EB"
 _METHOD = {"markowitz": "Markowitz", "black_litterman": "Black-Litterman", "hrp": "HRP"}
 _WRAPPER = {"livret_a": "Livret A", "pea": "PEA", "av": "Life insurance (AV)", "cto": "CTO"}
-_LAYOUT = {"margin": {"l": 10, "r": 10, "t": 40, "b": 10}, "template": "plotly_white"}
+_LAYOUT = {
+    "margin": {"l": 10, "r": 10, "t": 50, "b": 10},
+    "template": "plotly_white",
+    "colorway": ["#2558A8", "#B7791F", "#1F9D55", "#7C3AED", "#C2362B", "#0E9AA7", "#E8590C", "#DB2777"],
+    "font": {"family": "Inter, Arial, sans-serif", "color": INK, "size": 13},
+    "title_x": 0,
+    "title_xanchor": "left",
+    "title_font_size": 16,
+    "legend": {"orientation": "h", "y": 1.02, "yanchor": "bottom", "x": 1, "xanchor": "right"},
+    "xaxis": {"gridcolor": GRID, "zeroline": False},
+    "yaxis": {"gridcolor": GRID, "zeroline": False},
+    "paper_bgcolor": "rgba(0,0,0,0)",
+    "plot_bgcolor": "rgba(0,0,0,0)",
+}
 
 
 def fan_chart(goal, target: float | None = None) -> go.Figure:
@@ -24,13 +40,13 @@ def fan_chart(goal, target: float | None = None) -> go.Figure:
     fig.add_trace(
         go.Scatter(
             x=years, y=q["p10"], line={"width": 0}, fill="tonexty",
-            fillcolor="rgba(74,120,176,0.25)", name="P10 to P90",
+            fillcolor="rgba(37,88,168,0.16)", name="P10 to P90",
         )
     )  # fmt: skip
-    fig.add_trace(go.Scatter(x=years, y=q["p50"], line={"color": NAVY, "width": 2}, name="Median"))
+    fig.add_trace(go.Scatter(x=years, y=q["p50"], line={"color": BLUE, "width": 2.5}, name="Median"))
     if target is not None:
         fig.add_hline(
-            y=target, line={"color": ACCENT, "dash": "dash"},
+            y=target, line={"color": ORANGE, "dash": "dash", "width": 2},
             annotation_text="Target (nominal)", annotation_position="top left",
         )  # fmt: skip
     fig.update_layout(
@@ -73,8 +89,8 @@ def method_comparison(bucket_proposal) -> go.Figure:
     labels = [_METHOD.get(m, m) for m in methods]
     fig = go.Figure()
     for name, attr, color in (
-        ("Expected return", "expected_return", NAVY),
-        ("Volatility", "volatility", BLUE),
+        ("Expected return", "expected_return", BLUE),
+        ("Volatility", "volatility", ORANGE),
         ("Max drawdown", "max_drawdown", GREY),
     ):
         fig.add_trace(
@@ -92,9 +108,9 @@ def method_comparison(bucket_proposal) -> go.Figure:
 def payoff_histogram(payoff) -> go.Figure:
     """Distribution of the product's payoff multiple at exit (1.0 = capital back)."""
     fig = go.Figure(
-        go.Histogram(x=list(payoff.payoff_multiple), nbinsx=40, marker_color=NAVY, name="Payoff")
+        go.Histogram(x=list(payoff.payoff_multiple), nbinsx=40, marker_color=BLUE, name="Payoff")
     )
-    fig.add_vline(x=1.0, line={"color": ACCENT, "dash": "dash"}, annotation_text="Capital")
+    fig.add_vline(x=1.0, line={"color": ORANGE, "dash": "dash", "width": 2}, annotation_text="Capital")
     fig.update_layout(
         xaxis_title="Payoff multiple of invested capital", yaxis_title="Simulated paths",
         title="Structured product payoff distribution", showlegend=False, **_LAYOUT,
@@ -114,7 +130,7 @@ def drift_bars(drift, band: float = 0.05) -> go.Figure:
             fillcolor="rgba(154,165,177,0.25)", line={"width": 0}, layer="below",
         )  # fmt: skip
     fig.add_trace(go.Bar(x=classes, y=drift["target"] * 100, name="Target", marker_color=GREY))
-    fig.add_trace(go.Bar(x=classes, y=drift["current"] * 100, name="Current", marker_color=NAVY))
+    fig.add_trace(go.Bar(x=classes, y=drift["current"] * 100, name="Current", marker_color=BLUE))
     fig.update_layout(
         barmode="group", yaxis_title="% of portfolio",
         title=f"Target vs current weights (shaded: +/-{band * 100:.0f} pp band)", **_LAYOUT,
@@ -133,7 +149,7 @@ def goal_probability_change(review, goals) -> go.Figure:
     )  # fmt: skip
     fig.add_trace(
         go.Bar(x=names, y=[g.probability * 100 for g in review.goals_now], name="Now",
-               marker_color=NAVY)
+               marker_color=BLUE)
     )  # fmt: skip
     fig.update_layout(
         barmode="group", yaxis_title="Probability (%)", yaxis_range=[0, 100],

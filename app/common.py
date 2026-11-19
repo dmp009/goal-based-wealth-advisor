@@ -37,7 +37,7 @@ REVIEW_DOC_TABS = (
 
 
 def setup(title: str) -> None:
-    st.set_page_config(page_title=f"Wealth advisor - {title}", page_icon=None, layout="wide")
+    st.set_page_config(page_title=f"Wealth advisor - {title}", page_icon=":material/account_balance:", layout="wide")
 
 
 @st.cache_resource(show_spinner="Loading data snapshot...")
@@ -96,6 +96,6 @@ def facts_json(proposal) -> str:
 
 def footer() -> None:
     s = get_settings()
-    st.divider()
+    st.space("medium")
     st.caption(f"{s.disclaimer['en']} | {s.disclaimer['fr']}")
     st.caption(f"Market data as of {get_as_of()} (committed snapshot; no live data).")
